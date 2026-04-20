@@ -4,6 +4,9 @@ import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import "./globals.css";
 
+const FB_PIXEL_ID =
+  process.env.NEXT_PUBLIC_FB_PIXEL_ID || "1456485639472609";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -15,6 +18,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://clara.shop"
+  ),
   title: "Clara | Boutique officielle",
   description: "Découvrez les produits Clara et commandez facilement en ligne.",
   icons: {
@@ -69,7 +75,7 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1456485639472609');
+fbq('init', '${FB_PIXEL_ID}');
 fbq('track', 'PageView');`,
           }}
         />
@@ -78,7 +84,7 @@ fbq('track', 'PageView');`,
             height="1"
             width="1"
             style={{ display: "none" }}
-            src="https://www.facebook.com/tr?id=1456485639472609&ev=PageView&noscript=1"
+            src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
             alt="fb-pixel"
           />
         </noscript>
