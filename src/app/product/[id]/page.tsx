@@ -41,7 +41,7 @@ export default function ProductByIdPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPack, setSelectedPack] = useState<1 | 3>(1);
+  const [selectedPack, setSelectedPack] = useState<1 | 2 | 3>(1);
   const [selectedGovernor, setSelectedGovernor] = useState<string>("");
   const [isGovernorOpen, setIsGovernorOpen] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -68,6 +68,10 @@ export default function ProductByIdPage() {
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const addressInputRef = useRef<HTMLInputElement | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setSelectedPack(1);
+  }, [productId]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -253,7 +257,10 @@ export default function ProductByIdPage() {
       ? images[activeImageIndex]
       : primaryImage;
 
-  type PackKey = 1 | 3;
+  type PackKey = 1 | 2 | 3;
+
+  /** Produit #2 (Ice Roller) : ancienne présentation (3 packs, livraison 8 DT, ville). */
+  const classicIceRollerLayout = product.id === 2;
 
   const unitSale =
     product.salePrice != null && !Number.isNaN(product.salePrice)
@@ -279,6 +286,19 @@ export default function ProductByIdPage() {
           ? product.salePrice
           : product.price,
     },
+    2: {
+      label: "2x",
+      original:
+        product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
+          ? product.offer2OriginalPrice
+          : product.price * 2,
+      sale:
+        product.offer2SalePrice && !Number.isNaN(product.offer2SalePrice)
+          ? product.offer2SalePrice
+          : (product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
+              ? product.offer2OriginalPrice
+              : product.price * 2),
+    },
     3: {
       label: "3x",
       original:
@@ -294,6 +314,8 @@ export default function ProductByIdPage() {
     },
   };
 
+  const packLineup = classicIceRollerLayout ? ([1, 2, 3] as const) : ([1, 3] as const);
+
   const getDiscountPercent = (pack: { original: number | null; sale: number }) => {
     if (pack.original === null || Number.isNaN(pack.original)) return 0;
     if (pack.sale >= pack.original) return 0;
@@ -306,7 +328,12 @@ export default function ProductByIdPage() {
 
   const mainOriginalPrice = packPrices[1].original ?? base;
   const mainDiscountedPrice = packPrices[1].sale;
-  const total = subtotal;
+  const livraison = classicIceRollerLayout ? 8 : 0;
+  const total = subtotal + livraison;
+
+  const marqueeLivraisonText = classicIceRollerLayout
+    ? "Livraison partout en Tunisie 8 DT 🚚💨"
+    : "Livraison gratuite partout en Tunisie 🚚💨";
 
   const governorates = [
     "Tunis",
@@ -540,7 +567,7 @@ export default function ProductByIdPage() {
           <div className="flex w-max animate-[marquee_25s_linear_infinite] whitespace-nowrap">
             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
               <span key={i} className="mx-8 tracking-[0.18em] whitespace-nowrap">
-                Livraison gratuite partout en Tunisie 🚚💨
+                {marqueeLivraisonText}
               </span>
             ))}
           </div>
@@ -549,7 +576,7 @@ export default function ProductByIdPage() {
           <div className="flex w-max animate-[marquee_10s_linear_infinite] whitespace-nowrap">
             {[0, 1, 2].map((i) => (
               <span key={i} className="mx-8 tracking-[0.18em]">
-                Livraison gratuite partout en Tunisie 🚚💨
+                {marqueeLivraisonText}
               </span>
             ))}
           </div>
@@ -724,9 +751,11 @@ export default function ProductByIdPage() {
               {product.name}
             </h1>
             <div className="flex flex-col items-center gap-0.5 md:items-start">
-              <p className="text-xs text-zinc-700 line-through">
-                {mainOriginalPrice.toFixed(2)} DT
-              </p>
+              {mainDiscountedPrice < mainOriginalPrice - 0.001 && (
+                <p className="text-xs text-zinc-700 line-through">
+                  {mainOriginalPrice.toFixed(2)} DT
+                </p>
+              )}
               <p className="text-2xl font-semibold text-[#ff1744] md:text-3xl">
                 {mainDiscountedPrice.toFixed(2)} DT
               </p>
@@ -737,11 +766,12 @@ export default function ProductByIdPage() {
           <div className="space-y-3 text-sm">
             <p className="font-medium">Choisissez votre offre</p>
             <div className="space-y-3">
-              {([1, 3] as const).map((pack) => {
+              {packLineup.map((pack) => {
                 const cfg = packPrices[pack as PackKey];
                 const discountPercent = getDiscountPercent(cfg);
                 const isActive = selectedPack === pack;
-                const showTwoPlusOneBundle = pack === 3 && isThreeForTwoOffer;
+                const showTwoPlusOneBundle =
+                  pack === 3 && isThreeForTwoOffer && !classicIceRollerLayout;
 
                 return (
                   <button
@@ -953,7 +983,11 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[13px] font-semibold text-zinc-800">
               <span>Livraison</span>
-              <span className="text-emerald-700">Gratuite</span>
+              {classicIceRollerLayout ? (
+                <span>{livraison.toFixed(2)} DT</span>
+              ) : (
+                <span className="text-emerald-700">Gratuite</span>
+              )}
             </div>
             <div className="mt-2 flex items-baseline justify-between border-t border-[#ffd9a3] pt-2">
               <span className="text-[13px] font-bold text-zinc-900 tracking-wide uppercase">
@@ -1206,7 +1240,11 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[11px] text-zinc-700">
               <span>Livraison</span>
-              <span className="text-emerald-700 font-medium">Gratuite</span>
+              {classicIceRollerLayout ? (
+                <span>{livraison.toFixed(2)} DT</span>
+              ) : (
+                <span className="text-emerald-700 font-medium">Gratuite</span>
+              )}
             </div>
             <div className="mt-1 flex items-baseline justify-between border-t border-[#ffd9a3] pt-1">
               <span className="font-semibold uppercase tracking-wide text-[10px] text-zinc-900">
