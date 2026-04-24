@@ -41,7 +41,7 @@ export default async function AnalyticsPage() {
     prisma.product.count(),
   ]);
 
-  const SHIPPING_COST = 8;
+  const SHIPPING_COST = 0;
 
   // Charger les produits correspondants pour les agrégations par produit
   const productIds = Array.from(new Set(orders.map((o) => o.productId)));

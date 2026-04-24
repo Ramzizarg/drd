@@ -53,7 +53,8 @@ export default async function AdminDashboard({
     take: pageSize,
   });
 
-  const SHIPPING_COST = 8; // même coût que sur la page produit
+  // Livraison incluse dans le prix produit (aucune ligne livraison à déduire)
+  const SHIPPING_COST = 0;
 
   // Récupérer les produits associés aux commandes pour afficher leur nom + image
   const productIds = Array.from(new Set(orders.map((o) => o.productId)));
@@ -65,7 +66,6 @@ export default async function AdminDashboard({
   const stats = {
     totalOrders,
     products: productsCount,
-    // Revenu sans livraison: somme(total - 8)
     totalRevenue: (revenueAgg._sum.total ?? 0) - totalOrders * SHIPPING_COST,
     visitorsToday: 0,
     visitorsYesterdayDiff: 0,

@@ -41,7 +41,7 @@ export default function ProductByIdPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPack, setSelectedPack] = useState<1 | 2 | 3>(1);
+  const [selectedPack, setSelectedPack] = useState<1 | 3>(1);
   const [selectedGovernor, setSelectedGovernor] = useState<string>("");
   const [isGovernorOpen, setIsGovernorOpen] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -56,15 +56,16 @@ export default function ProductByIdPage() {
   const [fieldErrors, setFieldErrors] = useState({
     name: false,
     governor: false,
-    city: false,
     address: false,
     phone: false,
   });
+  const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
+  const [orderWaitDots, setOrderWaitDots] = useState("");
+  const orderSubmitLock = useRef(false);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   // Container for offers + form: used to scroll when user wants to see the order area
   const orderSectionRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
-  const cityInputRef = useRef<HTMLInputElement | null>(null);
   const addressInputRef = useRef<HTMLInputElement | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -181,6 +182,19 @@ export default function ProductByIdPage() {
     setActiveImageIndex(initialIndex);
   }, [product]);
 
+  useEffect(() => {
+    if (!isOrderSubmitting) {
+      setOrderWaitDots("");
+      return;
+    }
+    let step = 0;
+    const id = window.setInterval(() => {
+      step = (step + 1) % 4;
+      setOrderWaitDots(".".repeat(step));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, [isOrderSubmitting]);
+
   // From here down, reuse the exact same UI as /product/page.tsx
 
   if (loading) {
@@ -239,7 +253,22 @@ export default function ProductByIdPage() {
       ? images[activeImageIndex]
       : primaryImage;
 
-  type PackKey = 1 | 2 | 3;
+  type PackKey = 1 | 3;
+
+  const unitSale =
+    product.salePrice != null && !Number.isNaN(product.salePrice)
+      ? product.salePrice
+      : product.price;
+
+  const isThreeForTwoOffer =
+    product.offer3SalePrice != null &&
+    !Number.isNaN(product.offer3SalePrice) &&
+    product.offer3OriginalPrice != null &&
+    !Number.isNaN(product.offer3OriginalPrice) &&
+    Math.abs(product.offer3SalePrice - 2 * unitSale) < 0.05 &&
+    Math.abs(product.offer3OriginalPrice - 3 * unitSale) < 0.05;
+
+  const packShortName = product.name.split(" - ")[0];
 
   const packPrices: Record<PackKey, { label: string; original: number | null; sale: number }> = {
     1: {
@@ -249,19 +278,6 @@ export default function ProductByIdPage() {
         product.salePrice && !Number.isNaN(product.salePrice)
           ? product.salePrice
           : product.price,
-    },
-    2: {
-      label: "2x",
-      original:
-        product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
-          ? product.offer2OriginalPrice
-          : product.price * 2,
-      sale:
-        product.offer2SalePrice && !Number.isNaN(product.offer2SalePrice)
-          ? product.offer2SalePrice
-          : (product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
-              ? product.offer2OriginalPrice
-              : product.price * 2),
     },
     3: {
       label: "3x",
@@ -290,8 +306,7 @@ export default function ProductByIdPage() {
 
   const mainOriginalPrice = packPrices[1].original ?? base;
   const mainDiscountedPrice = packPrices[1].sale;
-  const livraison = 8;
-  const total = subtotal + livraison;
+  const total = subtotal;
 
   const governorates = [
     "Tunis",
@@ -320,8 +335,7 @@ export default function ProductByIdPage() {
     "Kebili",
   ];
 
-  // Name used in sidebar menu: only keep part before " - " (to hide Arabic suffix)
-  const sidebarProductName = product.name.split(" - ")[0];
+  const sidebarProductName = packShortName;
 
   const handleMobileScroll = () => {
     const el = carouselRef.current;
@@ -337,7 +351,6 @@ export default function ProductByIdPage() {
 
   const handleSubmitOrder = async () => {
     const name = nameInputRef.current?.value.trim() ?? "";
-    const city = cityInputRef.current?.value.trim() ?? "";
     const address = addressInputRef.current?.value.trim() ?? "";
     const phone = phoneInputRef.current?.value.trim() ?? "";
     const governor = selectedGovernor.trim();
@@ -345,12 +358,11 @@ export default function ProductByIdPage() {
     const nextFieldErrors = {
       name: !name,
       governor: !governor,
-      city: !city,
       address: !address,
       phone: !phone,
     };
 
-    if (!name || !governor || !city || !address || !phone) {
+    if (!name || !governor || !address || !phone) {
       setFieldErrors(nextFieldErrors);
       setFormError("Merci de remplir tous les champs pour valider votre commande.");
       // Scroll to the whole order block (offers + form), not just the inner form,
@@ -360,9 +372,15 @@ export default function ProductByIdPage() {
     }
 
     // Clear previous field-level errors on successful validation
-    setFieldErrors({ name: false, governor: false, city: false, address: false, phone: false });
+    setFieldErrors({ name: false, governor: false, address: false, phone: false });
+
+    if (orderSubmitLock.current) return;
+    orderSubmitLock.current = true;
+    setIsOrderSubmitting(true);
 
     try {
+      await new Promise((r) => setTimeout(r, 2000));
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -376,7 +394,7 @@ export default function ProductByIdPage() {
           phone,
           address,
           governor,
-          city,
+          city: "",
         }),
       });
 
@@ -400,7 +418,7 @@ export default function ProductByIdPage() {
             phone,
             address,
             governor,
-            city,
+            city: "",
           },
           "yZvRvrVIR1bQvMzrS" 
         );
@@ -414,6 +432,9 @@ export default function ProductByIdPage() {
     } catch (e) {
       console.error(e);
       setFormError("Une erreur est survenue lors de l'envoi de votre commande. Veuillez réessayer.");
+    } finally {
+      orderSubmitLock.current = false;
+      setIsOrderSubmitting(false);
     }
   };
 
@@ -519,7 +540,7 @@ export default function ProductByIdPage() {
           <div className="flex w-max animate-[marquee_25s_linear_infinite] whitespace-nowrap">
             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
               <span key={i} className="mx-8 tracking-[0.18em] whitespace-nowrap">
-                Livraison partout en Tunisie 8 DT 🚚💨
+                Livraison gratuite partout en Tunisie 🚚💨
               </span>
             ))}
           </div>
@@ -528,7 +549,7 @@ export default function ProductByIdPage() {
           <div className="flex w-max animate-[marquee_10s_linear_infinite] whitespace-nowrap">
             {[0, 1, 2].map((i) => (
               <span key={i} className="mx-8 tracking-[0.18em]">
-                Livraison partout en Tunisie 8 DT 🚚💨
+                Livraison gratuite partout en Tunisie 🚚💨
               </span>
             ))}
           </div>
@@ -716,16 +737,17 @@ export default function ProductByIdPage() {
           <div className="space-y-3 text-sm">
             <p className="font-medium">Choisissez votre offre</p>
             <div className="space-y-3">
-              {[1, 2, 3].map((pack) => {
+              {([1, 3] as const).map((pack) => {
                 const cfg = packPrices[pack as PackKey];
                 const discountPercent = getDiscountPercent(cfg);
                 const isActive = selectedPack === pack;
+                const showTwoPlusOneBundle = pack === 3 && isThreeForTwoOffer;
 
                 return (
                   <button
                     key={pack}
                     type="button"
-                    onClick={() => setSelectedPack(pack as 1 | 2 | 3)}
+                    onClick={() => setSelectedPack(pack)}
                     className={`flex w-full items-center justify-between rounded-3xl border px-4 py-3 text-left text-xs shadow-sm transition ${
                       isActive
                         ? "border-[#ff6b00] bg-gradient-to-r from-[#fff3e0] via-[#ffe0b2] to-white shadow-md ring-2 ring-[#ff6b00]/60"
@@ -744,14 +766,22 @@ export default function ProductByIdPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium flex items-baseline gap-1">
-                          <span className="text-sm font-extrabold text-[#ff1744] tracking-wide">
-                            {cfg.label}
-                          </span>
-                          <span className="text-[11px] text-zinc-900">
-                            {product.name}
-                          </span>
-                        </p>
+                        {showTwoPlusOneBundle ? (
+                          <p className="font-medium flex flex-wrap items-baseline gap-x-1.5 text-sm">
+                            <span className="font-extrabold tracking-wide text-[#ff1744]">2x</span>
+                            <span className="text-zinc-900">{packShortName}</span>
+                            <span className="font-semibold text-emerald-700">+ 1 Gratuite</span>
+                          </p>
+                        ) : (
+                          <p className="font-medium flex flex-wrap items-baseline gap-1">
+                            <span className="text-sm font-extrabold text-[#ff1744] tracking-wide">
+                              {cfg.label}
+                            </span>
+                            <span className="text-[11px] text-zinc-900">
+                              {product.name}
+                            </span>
+                          </p>
+                        )}
                         <span className="mt-1 inline-flex items-center rounded-full bg-[#ff1744] px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
                           {discountPercent > 0
                             ? `Économie ${discountPercent}%`
@@ -788,7 +818,6 @@ export default function ProductByIdPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Nom Complet */}
               <div className="group relative">
                 <label htmlFor="fullName" className="mb-1 block text-sm font-medium text-gray-700">
                   Nom complet <span className="text-red-500">*</span>
@@ -813,133 +842,101 @@ export default function ProductByIdPage() {
                 )}
               </div>
 
-              {/* Gouvernorat et Ville */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Gouvernorat Dropdown */}
-                <div className="group relative">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Gouvernorat <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsGovernorOpen(!isGovernorOpen)}
-                      className={`flex w-full items-center justify-between rounded-lg border ${fieldErrors.governor ? "border-red-500" : "border-gray-300"} bg-white p-3 text-left text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:outline-none focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1 ${selectedGovernor ? 'text-gray-900' : 'text-gray-500'}`}
-                    >
-                      <span>{selectedGovernor || "Sélectionnez votre gouvernorat"}</span>
-                      <svg className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isGovernorOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {isGovernorOpen && (
-                      <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
-                        {governorates.map((gov) => (
-                          <button
-                            key={gov}
-                            type="button"
-                            onClick={() => {
-                              setSelectedGovernor(gov);
-                              setIsGovernorOpen(false);
-                            }}
-                            className={`flex w-full items-center px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${selectedGovernor === gov ? 'bg-gray-100 text-[#ff6b00]' : 'text-gray-700'}`}
-                          >
-                            {gov}
-                            {selectedGovernor === gov && (
-                              <svg className="ml-auto h-5 w-5 text-[#ff6b00]" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              <div className="group">
+                <label htmlFor="phone" className="mb-1 block text-sm font-medium text-gray-700">
+                  Numéro de téléphone <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <span className="text-sm text-gray-500">+216</span>
                   </div>
-                  {fieldErrors.governor && (
-                    <p className="mt-1 text-xs text-red-600">Merci de choisir un gouvernorat.</p>
-                  )}
-                </div>
-
-                {/* Ville */}
-                <div className="group">
-                  <label htmlFor="city" className="mb-1 block text-sm font-medium text-gray-700">
-                    Ville <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="city"
-                      type="text"
-                      ref={cityInputRef}
-                      className={`block w-full rounded-lg border ${fieldErrors.city ? "border-red-500" : "border-gray-300"} bg-white p-3 text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1`}
-                      placeholder="Ex: Tunis, Sousse, Sfax..."
-                      required
-                    />
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
+                  <input
+                    id="phone"
+                    type="tel"
+                    ref={phoneInputRef}
+                    className={`block w-full rounded-lg border ${fieldErrors.phone ? "border-red-500" : "border-gray-300"} bg-white p-3 pl-16 text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1`}
+                    placeholder="Ex: 20123456"
+                    pattern="[0-9]{8}"
+                    title="Veuillez entrer un numéro de téléphone valide (8 chiffres)"
+                    required
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
                   </div>
                 </div>
+                <p className="mt-1 text-xs text-gray-500">Format : 8 chiffres (sans le 0 initial)</p>
+                {fieldErrors.phone && (
+                  <p className="mt-1 text-xs text-red-600">Merci de remplir ce champ avec un numéro valide.</p>
+                )}
               </div>
 
-              {/* Adresse et Téléphone */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Adresse */}
-                <div className="group">
-                  <label htmlFor="address" className="mb-1 block text-sm font-medium text-gray-700">
-                    Adresse complète <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="address"
-                      type="text"
-                      ref={addressInputRef}
-                      className={`block w-full rounded-lg border ${fieldErrors.address ? "border-red-500" : "border-gray-300"} bg-white p-3 text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1`}
-                      placeholder="N° rue, avenue, immeuble..."
-                      required
-                    />
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                      </svg>
+              <div className="group relative">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Gouvernorat <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsGovernorOpen(!isGovernorOpen)}
+                    className={`flex w-full items-center justify-between rounded-lg border ${fieldErrors.governor ? "border-red-500" : "border-gray-300"} bg-white p-3 text-left text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:outline-none focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1 ${selectedGovernor ? "text-gray-900" : "text-gray-500"}`}
+                  >
+                    <span>{selectedGovernor || "Sélectionnez votre gouvernorat"}</span>
+                    <svg className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isGovernorOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isGovernorOpen && (
+                    <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                      {governorates.map((gov) => (
+                        <button
+                          key={gov}
+                          type="button"
+                          onClick={() => {
+                            setSelectedGovernor(gov);
+                            setIsGovernorOpen(false);
+                          }}
+                          className={`flex w-full items-center px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${selectedGovernor === gov ? "bg-gray-100 text-[#ff6b00]" : "text-gray-700"}`}
+                        >
+                          {gov}
+                          {selectedGovernor === gov && (
+                            <svg className="ml-auto h-5 w-5 text-[#ff6b00]" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
                     </div>
-                  </div>
-                  {fieldErrors.address && (
-                    <p className="mt-1 text-xs text-red-600">Merci de remplir ce champ.</p>
                   )}
                 </div>
+                {fieldErrors.governor && (
+                  <p className="mt-1 text-xs text-red-600">Merci de choisir un gouvernorat.</p>
+                )}
+              </div>
 
-                {/* Téléphone */}
-                <div className="group">
-                  <label htmlFor="phone" className="mb-1 block text-sm font-medium text-gray-700">
-                    Téléphone <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <span className="text-sm text-gray-500">+216</span>
-                    </div>
-                    <input
-                      id="phone"
-                      type="tel"
-                      ref={phoneInputRef}
-                      className={`block w-full rounded-lg border ${fieldErrors.phone ? "border-red-500" : "border-gray-300"} bg-white p-3 pl-16 text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1`}
-                      placeholder="Ex: 20123456"
-                      pattern="[0-9]{8}"
-                      title="Veuillez entrer un numéro de téléphone valide (8 chiffres)"
-                      required
-                    />
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </div>
+              <div className="group">
+                <label htmlFor="address" className="mb-1 block text-sm font-medium text-gray-700">
+                  Adresse <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="address"
+                    type="text"
+                    ref={addressInputRef}
+                    className={`block w-full rounded-lg border ${fieldErrors.address ? "border-red-500" : "border-gray-300"} bg-white p-3 text-sm text-gray-900 shadow-sm transition-all duration-200 focus:border-[#ff6b00] focus:ring-2 focus:ring-[#ff6b00]/20 focus:ring-offset-1`}
+                    placeholder="N° rue, avenue, immeuble…"
+                    required
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Format: 8 chiffres (sans le 0 initial)</p>
-                  {fieldErrors.phone && (
-                    <p className="mt-1 text-xs text-red-600">Merci de remplir ce champ avec un numéro valide.</p>
-                  )}
                 </div>
+                {fieldErrors.address && (
+                  <p className="mt-1 text-xs text-red-600">Merci de remplir ce champ.</p>
+                )}
               </div>
             </div>
             {formError && (
@@ -956,7 +953,7 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[13px] font-semibold text-zinc-800">
               <span>Livraison</span>
-              <span>{livraison.toFixed(2)} DT</span>
+              <span className="text-emerald-700">Gratuite</span>
             </div>
             <div className="mt-2 flex items-baseline justify-between border-t border-[#ffd9a3] pt-2">
               <span className="text-[13px] font-bold text-zinc-900 tracking-wide uppercase">
@@ -971,22 +968,29 @@ export default function ProductByIdPage() {
           {/* Main desktop order button */}
           <button
             type="button"
+            disabled={isOrderSubmitting}
             onClick={handleSubmitOrder}
-            className="mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6b00] to-[#ff1744] py-3 text-sm font-semibold text-white shadow-md hover:brightness-95 md:inline-flex"
+            className={`mt-2 hidden w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6b00] to-[#ff1744] py-3 text-sm font-semibold text-white shadow-md md:inline-flex ${
+              isOrderSubmitting ? "cursor-wait opacity-90" : "hover:brightness-95"
+            }`}
           >
-            <span>Commander maintenant</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 transform rotate-180"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10.293 5.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L13.586 12H4a1 1 0 110-2h9.586l-3.293-3.293a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <span className="inline-block min-w-[11rem] text-center">
+              {isOrderSubmitting ? `Patientez${orderWaitDots}` : "Commander maintenant"}
+            </span>
+            {!isOrderSubmitting && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 shrink-0 transform rotate-180"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10.293 5.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L13.586 12H4a1 1 0 110-2h9.586l-3.293-3.293a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
           </button>
         </div>
       </section>
@@ -1045,22 +1049,32 @@ export default function ProductByIdPage() {
                           `Découvrez cette caractéristique exceptionnelle de notre produit conçue pour vous offrir une expérience utilisateur inégalée.`}
                       </p>
                       <button
+                        type="button"
+                        disabled={isOrderSubmitting}
                         onClick={handleSubmitOrder}
-                        className="mt-6 inline-flex items-center gap-2 px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-gradient-to-r from-[#ff6b00] to-[#ff1744] hover:from-[#ff7b1a] hover:to-[#ff2a52] transition-all duration-300 transform hover:-translate-y-0.5"
+                        className={`mt-6 inline-flex items-center gap-2 px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-gradient-to-r from-[#ff6b00] to-[#ff1744] transition-all duration-300 ${
+                          isOrderSubmitting
+                            ? "cursor-wait opacity-90"
+                            : "hover:from-[#ff7b1a] hover:to-[#ff2a52] transform hover:-translate-y-0.5"
+                        }`}
                       >
-                        <span>Commander maintenant</span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 transform rotate-180"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10.293 5.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L13.586 12H4a1 1 0 110-2h9.586l-3.293-3.293a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <span className="inline-block min-w-[11rem] text-center">
+                          {isOrderSubmitting ? `Patientez${orderWaitDots}` : "Commander maintenant"}
+                        </span>
+                        {!isOrderSubmitting && (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 shrink-0 transform rotate-180"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10.293 5.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L13.586 12H4a1 1 0 110-2h9.586l-3.293-3.293a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1192,7 +1206,7 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[11px] text-zinc-700">
               <span>Livraison</span>
-              <span>{livraison.toFixed(2)} DT</span>
+              <span className="text-emerald-700 font-medium">Gratuite</span>
             </div>
             <div className="mt-1 flex items-baseline justify-between border-t border-[#ffd9a3] pt-1">
               <span className="font-semibold uppercase tracking-wide text-[10px] text-zinc-900">
@@ -1206,10 +1220,15 @@ export default function ProductByIdPage() {
 
           <button
             type="button"
+            disabled={isOrderSubmitting}
             onClick={handleSubmitOrder}
-            className="flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff6b00] to-[#ff1744] px-4 py-3 text-sm font-semibold text-white shadow-md hover:brightness-95"
+            className={`flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff6b00] to-[#ff1744] px-4 py-3 text-sm font-semibold text-white shadow-md ${
+              isOrderSubmitting ? "cursor-wait opacity-90" : "hover:brightness-95"
+            }`}
           >
-            <span>Commander</span>
+            <span className="inline-block min-w-[9rem] text-center">
+              {isOrderSubmitting ? `Patientez${orderWaitDots}` : "Commander"}
+            </span>
           </button>
         </div>
       </div>

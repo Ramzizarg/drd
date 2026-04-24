@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       city,
     } = body || {};
 
-    if (!productId || !pack || !total || !name || !phone || !address || !governor || !city) {
+    if (!productId || !pack || !total || !name || !phone || !address || !governor) {
       return NextResponse.json({ message: "Champs manquants" }, { status: 400 });
     }
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         phone: String(phone),
         address: String(address),
         governor: String(governor),
-        city: String(city),
+        city: city != null && String(city).trim() !== "" ? String(city) : "",
       },
     });
 

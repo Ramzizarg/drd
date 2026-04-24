@@ -43,7 +43,7 @@ export function OrderStatusControls({
 
   return (
     <div className="flex flex-col gap-3 text-sm md:flex-row md:items-center md:justify-end md:gap-6 md:min-w-[320px]">
-      {/* Prix total produit (sans livraison) - visible on desktop only */}
+      {/* Montant total commande - visible on desktop only */}
       <div className="hidden text-right text-2xl font-bold text-[#ff1744] md:block md:min-w-[90px]">
         {netTotal.toFixed(2)} DT
       </div>
