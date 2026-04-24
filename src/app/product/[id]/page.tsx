@@ -754,8 +754,8 @@ export default function ProductByIdPage() {
                         : "border-zinc-200 bg-white hover:border-[#ff6b00]/40 hover:bg-[#fff7ec]"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-2xl bg-zinc-100 hidden sm:block">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl bg-zinc-100">
                         {primaryImage && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -765,7 +765,7 @@ export default function ProductByIdPage() {
                           />
                         )}
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         {showTwoPlusOneBundle ? (
                           <p className="font-medium flex flex-wrap items-baseline gap-x-1.5 text-sm">
                             <span className="font-extrabold tracking-wide text-[#ff1744]">2x</span>
@@ -789,7 +789,7 @@ export default function ProductByIdPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 pl-2 text-right">
                       {discountPercent > 0 && cfg.original !== null && (
                         <p className="text-[11px] text-zinc-400 line-through">
                           {cfg.original.toFixed(2)} DT
