@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Logo } from '@/components/Logo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,20 +44,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-3xl bg-white px-7 py-8 md:px-9 md:py-10 shadow-[0_18px_60px_rgba(15,23,42,0.10)] ring-1 ring-zinc-100">
         {/* Logo / Brand */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff6b00] to-[#ff1744] shadow-[0_10px_35px_rgba(248,113,113,0.30)]">
-            <span className="text-lg font-semibold text-white">C</span>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <div
-              className="text-3xl md:text-[32px] font-semibold tracking-tight text-zinc-900"
-              style={{ fontFamily: 'Abramo, var(--font-geist-sans), system-ui, sans-serif' }}
-            >
-              Clara
-            </div>
-            <span className="inline-flex items-center rounded-full bg-zinc-50 px-3 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500 ring-1 ring-zinc-200">
-              Tableau de bord admin
-            </span>
-          </div>
+          <Logo height={72} priority />
+          <span className="inline-flex items-center rounded-full bg-zinc-50 px-3 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500 ring-1 ring-zinc-200">
+            Tableau de bord admin
+          </span>
         </div>
 
         {error && (

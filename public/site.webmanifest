@@ -1,15 +1,15 @@
 {
-  "name": "Clara Boutique",
-  "short_name": "Clara",
+  "name": "DRD Fashion",
+  "short_name": "DRD Fashion",
   "icons": [
     {
-      "src": "/Carla.png",
-      "sizes": "192x192",
+      "src": "/drd-logo.png",
+      "sizes": "720x542",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
+  "theme_color": "#1a1a1a",
+  "background_color": "#1a1a1a",
   "display": "standalone"
 }

@@ -3,10 +3,11 @@ import Link from "next/link";
 import { LayoutDashboard, LineChart, Package, Home } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
 import { ExistingProductImagesEditor } from "@/components/admin/ExistingProductImagesEditor";
 import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor";
-import { put } from "@vercel/blob";
+import { uploadFile } from "@/lib/upload";
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
@@ -53,13 +54,10 @@ async function updateProduct(id: number, formData: FormData) {
 
     for (const file of validFiles) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const filename = `${Date.now()}-${file.name}`.replace(/\s+/g, "-");
-      const blob = await put(`products/${filename}`, buffer, {
-        access: "public",
-      });
+      const url = await uploadFile(`products`, file.name, buffer, file.type);
 
       uploadedFiles.push({
-        url: blob.url,
+        url,
         isPrimary: false,
       });
     }
@@ -154,12 +152,7 @@ async function updateProduct(id: number, formData: FormData) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filename = `${Date.now()}-feature-${i}-${file.name}`.replace(/\s+/g, "-");
-    const blob = await put(`features/${filename}`, buffer, {
-      access: "public",
-    });
-
-    featureUploads[i] = blob.url;
+    featureUploads[i] = await uploadFile(`features`, file.name, buffer, file.type);
   }
 
   // Update product features (characteristics)
@@ -289,9 +282,8 @@ export default async function EditProductPage({ params }: EditPageProps) {
       <header className="bg-zinc-900 text-sm text-zinc-100 shadow">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
-            <div className="text-xl font-semibold tracking-tight">
-              Clara <span className="text-[#ff5b5b]">Admin</span>
-            </div>
+            <Logo height={32} />
+            <span className="text-sm font-semibold text-[#ff5b5b]">Admin</span>
           </div>
           <nav className="flex items-center gap-4 overflow-x-auto md:gap-6">
             <Link

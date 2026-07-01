@@ -17,7 +17,7 @@ export const authOptions: NextAuthOptions = {
         // Fixed admin credentials
         if (
           credentials.email === 'admin' &&
-          credentials.password === 'ramzidhia1920'
+          credentials.password === 'farroukdrd123'
         ) {
           return {
             id: 'admin',

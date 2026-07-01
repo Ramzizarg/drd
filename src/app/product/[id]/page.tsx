@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Logo } from "@/components/Logo";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import emailjs from "@emailjs/browser";
@@ -94,62 +95,6 @@ export default function ProductByIdPage() {
       fetchProduct();
     }
   }, [productId]);
-
-  // Send ViewContent event to Meta Pixel + Conversions API when product is loaded
-  useEffect(() => {
-    if (!product) return;
-
-    const eventId = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    // Browser Pixel event with eventID for deduplication
-    try {
-      if (typeof window !== "undefined" && (window as any).fbq) {
-        (window as any).fbq(
-          "track",
-          "ViewContent",
-          {
-            content_ids: [String(product.id)],
-            content_type: "product",
-            value: product.salePrice && !Number.isNaN(product.salePrice)
-              ? product.salePrice
-              : product.price,
-            currency: "TND",
-          },
-          { eventID: eventId }
-        );
-      }
-    } catch (e) {
-      // ignore pixel errors
-    }
-
-    // Server-side Conversions API via our API route
-    const sendCapi = async () => {
-      try {
-        await fetch("/api/meta-capi", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            eventName: "ViewContent",
-            eventId,
-            productId: product.id,
-            value: product.salePrice && !Number.isNaN(product.salePrice)
-              ? product.salePrice
-              : product.price,
-            currency: "TND",
-            eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
-          }),
-        });
-      } catch {
-        // silently ignore CAPI errors on client
-      }
-    };
-
-    sendCapi();
-  }, [product]);
 
   // Load list of all products for the sidebar menu
   useEffect(() => {
@@ -436,7 +381,7 @@ export default function ProductByIdPage() {
           "service_8mo5zdf",
           "template_nrf56fs",
           {
-            to_email: "clara.shop.tn@gmail.com",
+            to_email: "farroukdrd@gmail.com",
             product_name: product.name,
             product_id: product.id,
             pack: selectedPack,
@@ -489,13 +434,10 @@ export default function ProductByIdPage() {
             <span>MENU</span>
           </button>
 
-          {/* Center: brand (texte seulement) */}
-          <p
-            className="flex items-center justify-center text-xl font-semibold tracking-tight text-zinc-900 md:text-2xl"
-            style={{ fontFamily: "Abramo, var(--font-geist-sans), system-ui, sans-serif" }}
-          >
-            Clara
-          </p>
+          {/* Center: brand logo */}
+          <div className="flex items-center justify-center">
+            <Logo height={48} priority />
+          </div>
 
           {/* Right: recherche + panier + coût */}
           <div className="flex items-center justify-end gap-4 text-xs text-zinc-600">
@@ -1121,7 +1063,7 @@ export default function ProductByIdPage() {
 
       <footer className="border-t border-zinc-200 bg-zinc-50/80">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-4 text-xs text-zinc-500 sm:flex-row">
-          <p>{new Date().getFullYear()} Clara. Tous droits réservés.</p>
+          <p>{new Date().getFullYear()} DRD Fashion. Tous droits réservés.</p>
           <div className="flex gap-4">
             <button className="hover:text-zinc-800">Confidentialité</button>
             <button className="hover:text-zinc-800">Conditions</button>
@@ -1144,12 +1086,7 @@ export default function ProductByIdPage() {
           {/* Drawer */}
           <div className="relative z-50 flex h-full w-64 flex-col bg-white shadow-2xl border-r border-zinc-200 translate-x-0 transition-transform duration-300 ease-out">
             <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-200">
-              <span
-                className="text-lg font-semibold tracking-tight text-zinc-900"
-                style={{ fontFamily: "Abramo, var(--font-geist-sans), system-ui, sans-serif" }}
-              >
-                Clara
-              </span>
+              <Logo height={36} />
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(false)}
@@ -1327,7 +1264,7 @@ export default function ProductByIdPage() {
                   <span className="font-semibold">Téléphone :</span> +216 50 556 197
                 </p>
                 <p>
-                  <span className="font-semibold">Email :</span> Clara.shop.tn@gmail.com
+                  <span className="font-semibold">Email :</span> farroukdrd@gmail.com
                 </p>
               </div>
               <div className="mt-6">

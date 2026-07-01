@@ -20,6 +20,9 @@
 # production
 /build
 
+# uploaded files (local dev fallback)
+/public/uploads
+
 # misc
 .DS_Store
 *.pem

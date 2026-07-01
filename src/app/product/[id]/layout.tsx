@@ -30,7 +30,7 @@ export async function generateMetadata({
 
   if (!idParam || Number.isNaN(id)) {
     return {
-      title: "Produit introuvable | Clara",
+      title: "Produit introuvable | DRD Fashion",
       robots: { index: false, follow: true },
     };
   }
@@ -60,12 +60,12 @@ export async function generateMetadata({
       },
     });
   } catch {
-    return { title: "Clara | Boutique officielle" };
+    return { title: "DRD Fashion | Boutique officielle" };
   }
 
   if (!product) {
     return {
-      title: "Produit introuvable | Clara",
+      title: "Produit introuvable | DRD Fashion",
       robots: { index: false, follow: true },
     };
   }
@@ -73,14 +73,14 @@ export async function generateMetadata({
   const primary = product.images.find((i) => i.isPrimary) ?? product.images[0];
   const imageCandidate = primary?.url || product.imageUrl;
   const ogImage =
-    toAbsoluteImageUrl(siteOrigin, imageCandidate) ?? `${siteOrigin}/Carla.png`;
+    toAbsoluteImageUrl(siteOrigin, imageCandidate) ?? `${siteOrigin}/drd-logo.png`;
 
-  const title = `${product.name} | Clara`;
+  const title = `${product.name} | DRD Fashion`;
   const plainDescription = product.description.replace(/\s+/g, " ").trim();
   const description =
     plainDescription.length > 155
       ? `${plainDescription.slice(0, 152)}...`
-      : plainDescription || `Commandez ${product.name} sur Clara.`;
+      : plainDescription || `Commandez ${product.name} sur DRD Fashion.`;
 
   const canonical = `${siteOrigin}/product/${id}`;
 
@@ -91,7 +91,7 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       url: canonical,
-      siteName: "Clara",
+      siteName: "DRD Fashion",
       locale: "fr_FR",
       title,
       description,

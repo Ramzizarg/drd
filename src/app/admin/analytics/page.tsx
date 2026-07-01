@@ -21,6 +21,7 @@ import {
   Home,
 } from "lucide-react";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { Logo } from "@/components/Logo";
 
 function getLastSixMonths() {
   const months: { key: string; label: string }[] = [];
@@ -117,9 +118,8 @@ export default async function AnalyticsPage() {
       <header className="bg-zinc-900 text-sm text-zinc-100 shadow">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
-            <div className="text-xl font-semibold tracking-tight">
-              Clara <span className="text-[#ff5b5b]">Admin</span>
-            </div>
+            <Logo height={32} />
+            <span className="text-sm font-semibold text-[#ff5b5b]">Admin</span>
           </div>
           <nav className="flex items-center gap-4 overflow-x-auto md:gap-6">
             <Link

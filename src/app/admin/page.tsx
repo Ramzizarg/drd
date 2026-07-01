@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { LayoutDashboard, LineChart, Package, Home, ShoppingCart, Eye, Clock, CheckCircle, X, Truck } from "lucide-react";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { Logo } from "@/components/Logo";
 import { revalidatePath } from "next/cache";
 import { OrderStatusControls } from "@/components/admin/OrderStatusControls";
 
@@ -35,11 +36,12 @@ async function updateOrderAdmin(formData: FormData) {
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams?: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }) {
   // Pagination basique: 10 commandes par page
   const pageSize = 10;
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1);
+  const params = await searchParams;
+  const currentPage = Math.max(1, Number(params.page ?? "1") || 1);
 
   // Récupération des statistiques et des commandes en base
   const totalOrders = await prisma.order.count();
@@ -115,9 +117,8 @@ export default async function AdminDashboard({
       <header className="bg-zinc-900 text-sm text-zinc-100 shadow">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
-            <div className="text-xl font-semibold tracking-tight">
-              Clara <span className="text-[#ff5b5b]">Admin</span>
-            </div>
+            <Logo height={32} />
+            <span className="text-sm font-semibold text-[#ff5b5b]">Admin</span>
           </div>
           <nav className="flex items-center gap-4 overflow-x-auto md:gap-6">
             <button className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-100 hover:text-white transition-colors">
