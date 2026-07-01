@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import type { MetadataRoute } from "next";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -6,23 +5,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const productEntries: MetadataRoute.Sitemap = [];
 
-  try {
-    const products = await prisma.product.findMany({
-      select: { id: true, updatedAt: true },
-    });
-
-    for (const product of products) {
-      productEntries.push({
-        url: `${baseUrl}/product/${product.id}`,
-        lastModified: product.updatedAt ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.7,
+  if (process.env.DATABASE_URL) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const products = await prisma.product.findMany({
+        select: { id: true, updatedAt: true },
       });
-    }
-  } catch {
-    // In case DB is not reachable during build/runtime, just skip product URLs
-  }
 
+      for (const product of products) {
+        productEntries.push({
+          url: `${baseUrl}/product/${product.id}`,
+          lastModified: product.updatedAt ?? new Date(),
+          changeFrequency: "weekly",
+          priority: 0.7,
+        });
+      }
+    } catch {
+      // Skip product URLs if DB is unreachable during build/runtime
+    }
+  }
   const staticEntries: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}/`,
