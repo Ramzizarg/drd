@@ -6,7 +6,9 @@ import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
 import { ProductFeaturesNewEditor } from "@/components/admin/ProductFeaturesNewEditor";
+import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { uploadFile } from "@/lib/upload";
+import { parseVariantList } from "@/lib/product-options";
 
 async function createProduct(formData: FormData) {
   "use server";
@@ -27,6 +29,8 @@ async function createProduct(formData: FormData) {
   const primaryIndex = parseInt(String(formData.get("primaryIndex") || "0"));
   const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
   const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
+  const colors = parseVariantList(formData.getAll("colors"));
+  const sizes = parseVariantList(formData.getAll("sizes"));
   
   if (!files || files.length === 0) {
     redirect("/admin/products");
@@ -71,6 +75,8 @@ async function createProduct(formData: FormData) {
       offer2SalePrice: offer2SalePrice && !Number.isNaN(offer2SalePrice) ? offer2SalePrice : null,
       offer3OriginalPrice: offer3OriginalPrice && !Number.isNaN(offer3OriginalPrice) ? offer3OriginalPrice : null,
       offer3SalePrice: offer3SalePrice && !Number.isNaN(offer3SalePrice) ? offer3SalePrice : null,
+      colors,
+      sizes,
     },
   });
   
@@ -204,6 +210,9 @@ export default function NewProductPage() {
                 Ajoutez une ou plusieurs images. Cliquez sur une image pour la définir comme principale.
               </p>
             </div>
+
+            {/* Couleurs & tailles */}
+            <ProductVariantsEditor />
 
             {/* Caractéristiques du produit */}
             <div className="space-y-2 rounded-xl border border-zinc-200 p-3">

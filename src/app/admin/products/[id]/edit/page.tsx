@@ -7,7 +7,9 @@ import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
 import { ExistingProductImagesEditor } from "@/components/admin/ExistingProductImagesEditor";
 import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor";
+import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { uploadFile } from "@/lib/upload";
+import { parseVariantList } from "@/lib/product-options";
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
@@ -40,6 +42,8 @@ async function updateProduct(id: number, formData: FormData) {
   const featureImageUrls = formData.getAll("featureImageUrls").map((v) => String(v));
   const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
   const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
+  const colors = parseVariantList(formData.getAll("colors"));
+  const sizes = parseVariantList(formData.getAll("sizes"));
 
   if (!name || !price || Number.isNaN(price)) {
     redirect("/admin/products");
@@ -247,6 +251,8 @@ async function updateProduct(id: number, formData: FormData) {
         offer3SalePrice && !Number.isNaN(offer3SalePrice)
           ? offer3SalePrice
           : null,
+      colors,
+      sizes,
     },
   });
 
@@ -356,6 +362,12 @@ export default async function EditProductPage({ params }: EditPageProps) {
                 </p>
               </div>
             </div>
+
+            {/* Couleurs & tailles */}
+            <ProductVariantsEditor
+              initialColors={product.colors ?? []}
+              initialSizes={product.sizes ?? []}
+            />
 
             {/* Caractéristiques du produit */}
             <div className="space-y-2 rounded-xl border border-zinc-200 p-3">

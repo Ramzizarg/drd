@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getFirstProductId } from "@/lib/products";
 
 const defaultSiteUrl = "https://clara.shop";
 
@@ -106,10 +108,29 @@ export async function generateMetadata({
   };
 }
 
-export default function ProductIdLayout({
+export default async function ProductIdLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ id: string }>;
 }) {
+  const { id: idParam } = await params;
+  const id = Number(idParam);
+
+  if (idParam && !Number.isNaN(id)) {
+    const exists = await prisma.product.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!exists) {
+      const firstProductId = await getFirstProductId();
+      if (firstProductId) {
+        redirect(`/product/${firstProductId}`);
+      }
+    }
+  }
+
   return children;
 }

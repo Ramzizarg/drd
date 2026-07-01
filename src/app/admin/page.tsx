@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatVariantSelections } from "@/lib/product-offers";
 import { format } from "date-fns";
 import Link from "next/link";
 import { LayoutDashboard, LineChart, Package, Home, ShoppingCart, Eye, Clock, CheckCircle, X, Truck } from "lucide-react";
@@ -83,6 +84,12 @@ export default async function AdminDashboard({
       phone: order.phone,
       productName: product?.name ?? `Produit #${order.productId}`,
       productImageUrl: product?.imageUrl ?? null,
+      color: order.color ?? null,
+      size: order.size ?? null,
+      variantSummary: formatVariantSelections(
+        order.variantColors?.length ? order.variantColors : order.color ? [order.color] : [],
+        order.variantSizes?.length ? order.variantSizes : order.size ? [order.size] : []
+      ),
       items: order.pack,
       total: order.total,
       netTotal: Math.max(order.total - SHIPPING_COST, 0),
@@ -318,6 +325,12 @@ export default async function AdminDashboard({
                       </div>
                       <div className="mt-0.5 text-xs text-zinc-500">
                         {order.items} article{order.items > 1 ? "s" : ""}
+                        {order.variantSummary && (
+                          <>
+                            {" · "}
+                            {order.variantSummary}
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

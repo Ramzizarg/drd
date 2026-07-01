@@ -83,6 +83,9 @@ model Product {
   offer3OriginalPrice Float? @map("offer3_original_price")
   offer3SalePrice     Float? @map("offer3_sale_price")
 
+  colors      String[] @default([])
+  sizes       String[] @default([])
+
   @@map("products")
 }
 
@@ -128,6 +131,10 @@ model Order {
   city           String
   pack           Int
   total          Float
+  color          String?
+  size           String?
+  variantColors  String[]     @default([]) @map("variant_colors")
+  variantSizes   String[]     @default([]) @map("variant_sizes")
   status         OrderStatus  @default(PENDING)
   phoneConfirmed Boolean      @default(false)
   createdAt      DateTime     @default(now())

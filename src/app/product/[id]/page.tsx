@@ -5,6 +5,17 @@ import { Logo } from "@/components/Logo";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import emailjs from "@emailjs/browser";
+import { getColorHex } from "@/lib/product-options";
+import {
+  createDefaultVariants,
+  formatVariantSelections,
+  getItemCountForPack,
+  getPackLineup,
+  getPackPrices,
+  isThreeForTwoOffer,
+  type PackKey,
+  type VariantSelection,
+} from "@/lib/product-offers";
 
 interface ProductImageFromApi {
   id: number;
@@ -33,6 +44,8 @@ interface Product {
   offer3SalePrice?: number | null;
   images?: ProductImageFromApi[];
   features?: ProductFeatureFromApi[];
+  colors?: string[];
+  sizes?: string[];
 }
 
 export default function ProductByIdPage() {
@@ -43,6 +56,9 @@ export default function ProductByIdPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPack, setSelectedPack] = useState<1 | 2 | 3>(1);
+  const [selectedVariants, setSelectedVariants] = useState<VariantSelection[]>([
+    { color: "", size: "" },
+  ]);
   const [selectedGovernor, setSelectedGovernor] = useState<string>("");
   const [isGovernorOpen, setIsGovernorOpen] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -59,6 +75,7 @@ export default function ProductByIdPage() {
     governor: false,
     address: false,
     phone: false,
+    variants: [] as { color: boolean; size: boolean }[],
   });
   const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
   const [orderWaitDots, setOrderWaitDots] = useState("");
@@ -72,7 +89,30 @@ export default function ProductByIdPage() {
 
   useEffect(() => {
     setSelectedPack(1);
+    setSelectedVariants([{ color: "", size: "" }]);
   }, [productId]);
+
+  useEffect(() => {
+    if (!product) return;
+    const lineup = getPackLineup(product);
+    setSelectedPack((current) => (lineup.includes(current) ? current : lineup[0]));
+  }, [product]);
+
+  useEffect(() => {
+    if (!product) return;
+    const itemCount = getItemCountForPack(selectedPack);
+    setSelectedVariants((current) => {
+      const next = createDefaultVariants(
+        itemCount,
+        product.colors ?? [],
+        product.sizes ?? []
+      );
+      return next.map((variant, index) => ({
+        color: current[index]?.color || variant.color,
+        size: current[index]?.size || variant.size,
+      }));
+    });
+  }, [product, selectedPack]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -202,64 +242,12 @@ export default function ProductByIdPage() {
       ? images[activeImageIndex]
       : primaryImage;
 
-  type PackKey = 1 | 2 | 3;
-
-  /** Produit #2 (Ice Roller) : ancienne présentation (3 packs, livraison 8 DT, ville). */
+  /** Produit #2 (Ice Roller) : livraison 8 DT, champ ville. */
   const classicIceRollerLayout = product.id === 2;
 
-  const unitSale =
-    product.salePrice != null && !Number.isNaN(product.salePrice)
-      ? product.salePrice
-      : product.price;
-
-  const isThreeForTwoOffer =
-    product.offer3SalePrice != null &&
-    !Number.isNaN(product.offer3SalePrice) &&
-    product.offer3OriginalPrice != null &&
-    !Number.isNaN(product.offer3OriginalPrice) &&
-    Math.abs(product.offer3SalePrice - 2 * unitSale) < 0.05 &&
-    Math.abs(product.offer3OriginalPrice - 3 * unitSale) < 0.05;
-
-  const packShortName = product.name.split(" - ")[0];
-
-  const packPrices: Record<PackKey, { label: string; original: number | null; sale: number }> = {
-    1: {
-      label: "1x",
-      original: product.price,
-      sale:
-        product.salePrice && !Number.isNaN(product.salePrice)
-          ? product.salePrice
-          : product.price,
-    },
-    2: {
-      label: "2x",
-      original:
-        product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
-          ? product.offer2OriginalPrice
-          : product.price * 2,
-      sale:
-        product.offer2SalePrice && !Number.isNaN(product.offer2SalePrice)
-          ? product.offer2SalePrice
-          : (product.offer2OriginalPrice && !Number.isNaN(product.offer2OriginalPrice)
-              ? product.offer2OriginalPrice
-              : product.price * 2),
-    },
-    3: {
-      label: "3x",
-      original:
-        product.offer3OriginalPrice && !Number.isNaN(product.offer3OriginalPrice)
-          ? product.offer3OriginalPrice
-          : product.price * 3,
-      sale:
-        product.offer3SalePrice && !Number.isNaN(product.offer3SalePrice)
-          ? product.offer3SalePrice
-          : (product.offer3OriginalPrice && !Number.isNaN(product.offer3OriginalPrice)
-              ? product.offer3OriginalPrice
-              : product.price * 3),
-    },
-  };
-
-  const packLineup = classicIceRollerLayout ? ([1, 2, 3] as const) : ([1, 3] as const);
+  const packPrices = getPackPrices(product);
+  const packLineup = getPackLineup(product);
+  const threeForTwoOffer = isThreeForTwoOffer(product);
 
   const getDiscountPercent = (pack: { original: number | null; sale: number }) => {
     if (pack.original === null || Number.isNaN(pack.original)) return 0;
@@ -267,6 +255,8 @@ export default function ProductByIdPage() {
     const percent = 100 - (pack.sale * 100) / pack.original;
     return Math.round(percent);
   };
+
+  const packShortName = product.name.split(" - ")[0];
 
   const selectedPackInfo = packPrices[selectedPack];
   const subtotal = selectedPackInfo.sale;
@@ -326,29 +316,50 @@ export default function ProductByIdPage() {
     const address = addressInputRef.current?.value.trim() ?? "";
     const phone = phoneInputRef.current?.value.trim() ?? "";
     const governor = selectedGovernor.trim();
+    const hasColors = (product?.colors?.length ?? 0) > 0;
+    const hasSizes = (product?.sizes?.length ?? 0) > 0;
+
+    const variantErrors = selectedVariants.map((variant) => ({
+      color: hasColors && !variant.color,
+      size: hasSizes && !variant.size,
+    }));
 
     const nextFieldErrors = {
       name: !name,
       governor: !governor,
       address: !address,
       phone: !phone,
+      variants: variantErrors,
     };
 
-    if (!name || !governor || !address || !phone) {
+    const hasVariantErrors = variantErrors.some((variant) => variant.color || variant.size);
+
+    if (!name || !governor || !address || !phone || hasVariantErrors) {
       setFieldErrors(nextFieldErrors);
-      setFormError("Merci de remplir tous les champs pour valider votre commande.");
-      // Scroll to the whole order block (offers + form), not just the inner form,
-      // so on mobile you see all inputs and context comme les attributs en rouge
+      setFormError(
+        hasColors || hasSizes
+          ? "Merci de remplir tous les champs et de choisir une couleur et une taille pour chaque article."
+          : "Merci de remplir tous les champs pour valider votre commande."
+      );
       orderSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
-    // Clear previous field-level errors on successful validation
-    setFieldErrors({ name: false, governor: false, address: false, phone: false });
+    setFieldErrors({
+      name: false,
+      governor: false,
+      address: false,
+      phone: false,
+      variants: selectedVariants.map(() => ({ color: false, size: false })),
+    });
 
     if (orderSubmitLock.current) return;
     orderSubmitLock.current = true;
     setIsOrderSubmitting(true);
+
+    const variantColors = selectedVariants.map((variant) => variant.color);
+    const variantSizes = selectedVariants.map((variant) => variant.size);
+    const variantSummary = formatVariantSelections(variantColors, variantSizes);
 
     try {
       await new Promise((r) => setTimeout(r, 2000));
@@ -367,6 +378,10 @@ export default function ProductByIdPage() {
           address,
           governor,
           city: "",
+          color: variantColors[0] || null,
+          size: variantSizes[0] || null,
+          variantColors,
+          variantSizes,
         }),
       });
 
@@ -375,7 +390,6 @@ export default function ProductByIdPage() {
         return;
       }
 
-      // Try to send notification email via EmailJS (client-side)
       try {
         await emailjs.send(
           "service_8mo5zdf",
@@ -391,8 +405,10 @@ export default function ProductByIdPage() {
             address,
             governor,
             city: "",
+            color: variantSummary,
+            size: variantSummary,
           },
-          "yZvRvrVIR1bQvMzrS" 
+          "yZvRvrVIR1bQvMzrS"
         );
       } catch (err) {
         console.error("Erreur lors de l'envoi de l'email EmailJS", err);
@@ -705,6 +721,7 @@ export default function ProductByIdPage() {
           </div>
 
           {/* Packs / options comme les cartes d'offre */}
+          {packLineup.length > 1 && (
           <div className="space-y-3 text-sm">
             <p className="font-medium">Choisissez votre offre</p>
             <div className="space-y-3">
@@ -712,8 +729,7 @@ export default function ProductByIdPage() {
                 const cfg = packPrices[pack as PackKey];
                 const discountPercent = getDiscountPercent(cfg);
                 const isActive = selectedPack === pack;
-                const showTwoPlusOneBundle =
-                  pack === 3 && isThreeForTwoOffer && !classicIceRollerLayout;
+                const showTwoPlusOneBundle = pack === 3 && threeForTwoOffer;
 
                 return (
                   <button
@@ -776,6 +792,112 @@ export default function ProductByIdPage() {
               })}
             </div>
           </div>
+          )}
+
+          {/* Couleur & taille — une sélection par article selon l'offre */}
+          {((product.colors?.length ?? 0) > 0 || (product.sizes?.length ?? 0) > 0) && (
+            <div className="space-y-4 text-sm">
+              {selectedVariants.map((variant, index) => {
+                const variantError = fieldErrors.variants[index];
+                const itemLabel =
+                  selectedVariants.length > 1
+                    ? `${packShortName} ${index + 1}`
+                    : packShortName;
+
+                return (
+                  <div
+                    key={`variant-${index}`}
+                    className={`space-y-3 rounded-2xl border p-4 ${
+                      selectedVariants.length > 1
+                        ? "border-zinc-200 bg-zinc-50/60"
+                        : "border-transparent bg-transparent p-0"
+                    }`}
+                  >
+                    {selectedVariants.length > 1 && (
+                      <p className="text-sm font-semibold text-zinc-900">{itemLabel}</p>
+                    )}
+
+                    {(product.colors?.length ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium">
+                          Couleur <span className="text-red-500">*</span>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {product.colors!.map((color) => {
+                            const isActive = variant.color === color;
+                            const hex = getColorHex(color);
+                            return (
+                              <button
+                                key={`${index}-${color}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedVariants((current) =>
+                                    current.map((entry, entryIndex) =>
+                                      entryIndex === index ? { ...entry, color } : entry
+                                    )
+                                  )
+                                }
+                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                                  isActive
+                                    ? "border-[#ff6b00] bg-[#fff7ec] ring-2 ring-[#ff6b00]/40"
+                                    : "border-zinc-200 bg-white hover:border-zinc-300"
+                                }`}
+                              >
+                                <span
+                                  className="h-4 w-4 rounded-full border border-zinc-300"
+                                  style={{ backgroundColor: hex }}
+                                />
+                                {color}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {variantError?.color && (
+                          <p className="text-xs text-red-600">Merci de choisir une couleur.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {(product.sizes?.length ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium">
+                          Taille <span className="text-red-500">*</span>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {product.sizes!.map((size) => {
+                            const isActive = variant.size === size;
+                            return (
+                              <button
+                                key={`${index}-${size}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedVariants((current) =>
+                                    current.map((entry, entryIndex) =>
+                                      entryIndex === index ? { ...entry, size } : entry
+                                    )
+                                  )
+                                }
+                                className={`min-w-[3rem] rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+                                  isActive
+                                    ? "border-[#ff6b00] bg-[#fff7ec] text-[#ff6b00] ring-2 ring-[#ff6b00]/40"
+                                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                                }`}
+                              >
+                                {size}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {variantError?.size && (
+                          <p className="text-xs text-red-600">Merci de choisir une taille.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Formulaire : infos client / livraison */}
           <div className="space-y-4">
