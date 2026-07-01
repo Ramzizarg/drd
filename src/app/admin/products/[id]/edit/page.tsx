@@ -2,68 +2,83 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { LayoutDashboard, LineChart, Package, Home } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { revalidatePath } from "next/cache";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
 import { ExistingProductImagesEditor } from "@/components/admin/ExistingProductImagesEditor";
 import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
+import { ProductEditForm } from "@/components/admin/ProductEditForm";
 import { uploadFile } from "@/lib/upload";
 import { parseVariantList } from "@/lib/product-options";
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }
 
-async function updateProduct(id: number, formData: FormData) {
+type FormState = {
+  error?: string;
+  success?: boolean;
+};
+
+function parseOptionalPrice(raw: FormDataEntryValue | null): number | null {
+  if (raw == null || String(raw).trim() === "") return null;
+  const value = parseFloat(String(raw));
+  return Number.isNaN(value) ? null : value;
+}
+
+async function updateProduct(
+  id: number,
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
   "use server";
 
-  const name = String(formData.get("name") || "").trim();
-  const description = String(formData.get("description") || "").trim();
-  const price = parseFloat(String(formData.get("price") || "0"));
-  const salePriceRaw = formData.get("salePrice");
-  const salePrice = salePriceRaw ? parseFloat(String(salePriceRaw)) : null;
-  const offer2OriginalRaw = formData.get("offer2OriginalPrice");
-  const offer2SaleRaw = formData.get("offer2SalePrice");
-  const offer3OriginalRaw = formData.get("offer3OriginalPrice");
-  const offer3SaleRaw = formData.get("offer3SalePrice");
-  const offer2OriginalPrice = offer2OriginalRaw ? parseFloat(String(offer2OriginalRaw)) : null;
-  const offer2SalePrice = offer2SaleRaw ? parseFloat(String(offer2SaleRaw)) : null;
-  const offer3OriginalPrice = offer3OriginalRaw ? parseFloat(String(offer3OriginalRaw)) : null;
-  const offer3SalePrice = offer3SaleRaw ? parseFloat(String(offer3SaleRaw)) : null;
-  const files = formData.getAll("files") as File[];
-  const primaryIndexRaw = formData.get("primaryIndex");
-  let primaryIndex = primaryIndexRaw != null ? Number(primaryIndexRaw) : -1;
-  if (Number.isNaN(primaryIndex)) {
-    primaryIndex = -1;
-  }
-  const removeImageIdsRaw = formData.getAll("removeImageIds");
-  const primaryExistingIdRaw = formData.get("primaryExistingId");
-  const featureImageUrls = formData.getAll("featureImageUrls").map((v) => String(v));
-  const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
-  const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
-  const colors = parseVariantList(formData.getAll("colors"));
-  const sizes = parseVariantList(formData.getAll("sizes"));
+  try {
+    const name = String(formData.get("name") || "").trim();
+    const description = String(formData.get("description") || "").trim();
+    const price = parseFloat(String(formData.get("price") || "0"));
+    const salePrice = parseOptionalPrice(formData.get("salePrice"));
+    const offer2OriginalPrice = parseOptionalPrice(formData.get("offer2OriginalPrice"));
+    const offer2SalePrice = parseOptionalPrice(formData.get("offer2SalePrice"));
+    const offer3OriginalPrice = parseOptionalPrice(formData.get("offer3OriginalPrice"));
+    const offer3SalePrice = parseOptionalPrice(formData.get("offer3SalePrice"));
+    const files = formData.getAll("files") as File[];
+    const primaryIndexRaw = formData.get("primaryIndex");
+    let primaryIndex = primaryIndexRaw != null ? Number(primaryIndexRaw) : -1;
+    if (Number.isNaN(primaryIndex)) primaryIndex = -1;
 
-  if (!name || !price || Number.isNaN(price)) {
-    redirect("/admin/products");
-  }
+    const removeImageIdsRaw = formData.getAll("removeImageIds");
+    const primaryExistingIdRaw = formData.get("primaryExistingId");
+    const featureImageUrls = formData.getAll("featureImageUrls").map((v) => String(v));
+    const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
+    const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
+    const colors = parseVariantList(formData.getAll("colors"));
+    const sizes = parseVariantList(formData.getAll("sizes"));
 
-  const uploadedFiles: { url: string; isPrimary: boolean }[] = [];
-  let newPrimaryUrl: string | null = null;
+    if (!name || !price || Number.isNaN(price)) {
+      return { error: "Le nom et le prix sont obligatoires." };
+    }
 
-  // Handle new file uploads - only process actual files with names and size > 0
-  if (files && files.length > 0) {
+    const uploadWarnings: string[] = [];
+    const uploadedFiles: { url: string; isPrimary: boolean }[] = [];
+    let newPrimaryUrl: string | null = null;
+
     const validFiles = Array.from(files).filter((file) => file && file.name && file.size > 0);
 
     for (const file of validFiles) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const url = await uploadFile(`products`, file.name, buffer, file.type);
-
-      uploadedFiles.push({
-        url,
-        isPrimary: false,
-      });
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const url = await uploadFile("products", file.name, buffer, file.type);
+        uploadedFiles.push({ url, isPrimary: false });
+      } catch (err) {
+        uploadWarnings.push(
+          err instanceof Error ? err.message : "Impossible d'ajouter une image produit."
+        );
+      }
     }
 
     if (uploadedFiles.length > 0) {
@@ -77,214 +92,195 @@ async function updateProduct(id: number, formData: FormData) {
       });
 
       newPrimaryUrl = uploadedFiles[safePrimaryIndex].url;
+
+      await Promise.all(
+        uploadedFiles.map((file) =>
+          prisma.productImage.create({
+            data: {
+              productId: id,
+              url: file.url,
+              isPrimary: file.isPrimary,
+            },
+          })
+        )
+      );
     }
 
-    await Promise.all(
-      uploadedFiles.map((file) =>
-        prisma.productImage.create({
-          data: {
-            productId: id,
-            url: file.url,
-            isPrimary: file.isPrimary,
-          },
-        })
-      )
-    );
-  }
+    const removeIds = removeImageIdsRaw
+      .map((value) => Number(String(value)))
+      .filter((num) => !Number.isNaN(num));
 
-  // Handle image removal
-  const removeIds = removeImageIdsRaw
-    .map(value => {
-      const num = Number(String(value));
-      return Number.isNaN(num) ? null : num;
-    })
-    .filter((num): num is number => num !== null);
+    if (removeIds.length > 0) {
+      await prisma.productImage.deleteMany({
+        where: { productId: id, id: { in: removeIds } },
+      });
+    }
 
-  if (removeIds.length > 0) {
-    await prisma.productImage.deleteMany({
-      where: {
-        productId: id,
-        id: { in: removeIds },
+    if (primaryExistingIdRaw) {
+      const primaryExistingId = Number(String(primaryExistingIdRaw));
+      if (!Number.isNaN(primaryExistingId)) {
+        await prisma.productImage.updateMany({
+          where: { productId: id },
+          data: { isPrimary: false },
+        });
+
+        const updatedPrimary = await prisma.productImage.update({
+          where: { id: primaryExistingId },
+          data: { isPrimary: true },
+        });
+        newPrimaryUrl = updatedPrimary.url;
+      }
+    }
+
+    if (!newPrimaryUrl) {
+      const existingPrimary = await prisma.productImage.findFirst({
+        where: { productId: id, isPrimary: true },
+      });
+      if (existingPrimary) newPrimaryUrl = existingPrimary.url;
+    }
+
+    const featureUploads: (string | null)[] = [];
+
+    for (let i = 0; i < featureImageUrls.length; i++) {
+      const raw = formData.get(`featureNewImage_${i}`);
+      const file = raw instanceof File ? raw : null;
+
+      if (!file || !file.name || file.size <= 0) {
+        featureUploads[i] = null;
+        continue;
+      }
+
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        featureUploads[i] = await uploadFile("features", file.name, buffer, file.type);
+      } catch (err) {
+        uploadWarnings.push(
+          err instanceof Error ? err.message : "Impossible d'ajouter une image caractéristique."
+        );
+        featureUploads[i] = null;
+      }
+    }
+
+    await prisma.productFeature.deleteMany({ where: { productId: id } });
+
+    const featuresData = featureImageUrls
+      .map((imageUrl, index) => {
+        const overrideUrl = featureUploads[index];
+        const finalUrl = overrideUrl ?? imageUrl.trim();
+        return {
+          imageUrl: finalUrl,
+          title: (featureTitles[index] || "").trim(),
+          description: (featureDescriptions[index] || "").trim(),
+          order: index,
+        };
+      })
+      .filter((f) => f.imageUrl && f.title);
+
+    if (featuresData.length > 0) {
+      await prisma.productFeature.createMany({
+        data: featuresData.map((f) => ({
+          productId: id,
+          imageUrl: f.imageUrl,
+          title: f.title,
+          description: f.description,
+          order: f.order,
+        })),
+      });
+    }
+
+    let finalImageUrl: string | null = newPrimaryUrl;
+
+    if (!finalImageUrl) {
+      const primaryImage = await prisma.productImage.findFirst({
+        where: { productId: id, isPrimary: true },
+      });
+
+      if (primaryImage) {
+        finalImageUrl = primaryImage.url;
+      } else {
+        const anyImage = await prisma.productImage.findFirst({
+          where: { productId: id },
+          orderBy: { id: "asc" },
+        });
+
+        if (anyImage) {
+          finalImageUrl = anyImage.url;
+          await prisma.productImage.update({
+            where: { id: anyImage.id },
+            data: { isPrimary: true },
+          });
+        }
+      }
+    }
+
+    const existing = await prisma.product.findUnique({
+      where: { id },
+      select: { imageUrl: true },
+    });
+
+    if (!finalImageUrl) {
+      finalImageUrl = existing?.imageUrl ?? "";
+    }
+
+    await prisma.product.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        price,
+        salePrice,
+        imageUrl: finalImageUrl,
+        offer2OriginalPrice,
+        offer2SalePrice,
+        offer3OriginalPrice,
+        offer3SalePrice,
+        colors,
+        sizes,
       },
     });
-  }
 
-  // Handle primary image selection
-  if (primaryExistingIdRaw) {
-    const primaryExistingId = Number(String(primaryExistingIdRaw));
-    if (!Number.isNaN(primaryExistingId)) {
-      // First, set all images to not primary
-      await prisma.productImage.updateMany({
-        where: { productId: id },
-        data: { isPrimary: false },
-      });
+    revalidatePath("/admin/products");
+    revalidatePath(`/admin/products/${id}/edit`);
+    revalidatePath(`/product/${id}`);
 
-      // Then set the selected one as primary
-      const updatedPrimary = await prisma.productImage.update({
-        where: { id: primaryExistingId },
-        data: { isPrimary: true },
-      });
-      newPrimaryUrl = updatedPrimary.url;
-    }
-  }
-
-  // If we still don't have a primary URL, try to get an existing one
-  if (!newPrimaryUrl) {
-    const existingPrimary = await prisma.productImage.findFirst({
-      where: { 
-        productId: id,
-        isPrimary: true 
-      }
-    });
-    
-    if (existingPrimary) {
-      newPrimaryUrl = existingPrimary.url;
-    }
-  }
-
-  // Upload any new feature images from desktop and map them by row index
-  const featureUploads: (string | null)[] = [];
-
-  for (let i = 0; i < featureImageUrls.length; i++) {
-    const raw = formData.get(`featureNewImage_${i}`);
-    const file = raw instanceof File ? (raw as File) : null;
-
-    // If no new file was chosen for this row, keep null so we reuse existing URL
-    if (!file || !file.name || file.size <= 0) {
-      featureUploads[i] = null;
-      continue;
+    if (uploadWarnings.length > 0) {
+      redirect(
+        `/admin/products/${id}/edit?saved=1&warn=${encodeURIComponent(uploadWarnings[0])}`
+      );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    featureUploads[i] = await uploadFile(`features`, file.name, buffer, file.type);
+    redirect(`/admin/products/${id}/edit?saved=1`);
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    console.error("Error updating product", err);
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Une erreur est survenue lors de l'enregistrement.",
+    };
   }
-
-  // Update product features (characteristics)
-  await prisma.productFeature.deleteMany({ where: { productId: id } });
-
-  const featuresData = featureImageUrls
-    .map((imageUrl, index) => {
-      const overrideUrl = featureUploads[index];
-      const finalUrl = (overrideUrl ?? imageUrl.trim());
-
-      return {
-        imageUrl: finalUrl,
-        title: (featureTitles[index] || "").trim(),
-        description: (featureDescriptions[index] || "").trim(),
-        order: index,
-      };
-    })
-    // Save a feature as long as it has an image and a title; description is optional
-    .filter((f) => f.imageUrl && f.title);
-
-  if (featuresData.length > 0) {
-    await prisma.productFeature.createMany({
-      data: featuresData.map((f) => ({
-        productId: id,
-        imageUrl: f.imageUrl,
-        title: f.title,
-        description: f.description,
-        order: f.order,
-      })),
-    });
-  }
-
-  // Ensure we have a valid primary URL
-  let finalImageUrl: string | null = newPrimaryUrl;
-  
-  if (!finalImageUrl) {
-    // If no new primary URL was set, try to get the existing primary image
-    const primaryImage = await prisma.productImage.findFirst({
-      where: { 
-        productId: id,
-        isPrimary: true 
-      }
-    });
-    
-    if (primaryImage) {
-      finalImageUrl = primaryImage.url;
-    } else {
-      // If no primary image is set, get the first available image
-      const anyImage = await prisma.productImage.findFirst({
-        where: { productId: id },
-        orderBy: { id: 'asc' },
-        take: 1
-      });
-      if (anyImage) {
-        finalImageUrl = anyImage.url;
-        // Set this image as primary
-        await prisma.productImage.update({
-          where: { id: anyImage.id },
-          data: { isPrimary: true }
-        });
-      }
-    }
-  }
-  
-  // If we still don't have an image URL, use an empty string as fallback
-  if (!finalImageUrl) {
-    console.warn('No valid image URL found for product', id);
-    finalImageUrl = '';
-  }
-
-  await prisma.product.update({
-    where: { id },
-    data: {
-      name,
-      description,
-      price,
-      salePrice: salePrice && !Number.isNaN(salePrice) ? salePrice : null,
-      ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
-      offer2OriginalPrice:
-        offer2OriginalPrice && !Number.isNaN(offer2OriginalPrice)
-          ? offer2OriginalPrice
-          : null,
-      offer2SalePrice:
-        offer2SalePrice && !Number.isNaN(offer2SalePrice)
-          ? offer2SalePrice
-          : null,
-      offer3OriginalPrice:
-        offer3OriginalPrice && !Number.isNaN(offer3OriginalPrice)
-          ? offer3OriginalPrice
-          : null,
-      offer3SalePrice:
-        offer3SalePrice && !Number.isNaN(offer3SalePrice)
-          ? offer3SalePrice
-          : null,
-      colors,
-      sizes,
-    },
-  });
-
-  redirect("/admin/products");
 }
 
-export default async function EditProductPage({ params }: EditPageProps) {
+export default async function EditProductPage({ params, searchParams }: EditPageProps) {
   const { id } = await params;
+  const { saved, warn } = await searchParams;
   const numericId = Number(id);
-  if (Number.isNaN(numericId)) {
-    notFound();
-  }
+
+  if (Number.isNaN(numericId)) notFound();
 
   const product = await prisma.product.findUnique({
     where: { id: numericId },
     include: {
-      images: {
-        orderBy: { createdAt: "asc" },
-      },
-      features: {
-        orderBy: { order: "asc" },
-      },
+      images: { orderBy: { createdAt: "asc" } },
+      features: { orderBy: { order: "asc" } },
     },
   });
 
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
   return (
     <div className="min-h-screen bg-[#faf7f6] text-zinc-900">
-      {/* Shared admin header */}
       <header className="bg-zinc-900 text-sm text-zinc-100 shadow">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
@@ -328,11 +324,17 @@ export default async function EditProductPage({ params }: EditPageProps) {
       <main className="flex-1 flex justify-center items-start px-4 pt-6 pb-12">
         <div className="w-full max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight mb-6">Modifier le produit</h1>
-          <form
+
+          <ProductEditForm
             action={updateProduct.bind(null, product.id)}
-            className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100"
+            saved={saved === "1"}
           >
-            {/* Nom */}
+            {warn && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Produit enregistré, mais : {decodeURIComponent(warn)}
+              </div>
+            )}
+
             <div className="space-y-1">
               <label className="text-sm font-medium text-zinc-800" htmlFor="name">
                 Nom du produit
@@ -346,39 +348,35 @@ export default async function EditProductPage({ params }: EditPageProps) {
               />
             </div>
 
-            {/* Images */}
             <div className="space-y-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-zinc-800">
                   Images du produit
                 </label>
                 <ProductImagesUploader>
-                  {product.images && product.images.length > 0 && (
+                  {product.images.length > 0 && (
                     <ExistingProductImagesEditor images={product.images} />
                   )}
                 </ProductImagesUploader>
                 <p className="text-[11px] text-zinc-500">
-                  Ajoutez une ou plusieurs images. Cliquez sur une image pour la définir comme principale.
+                  Modifiez les images si besoin. Sinon, enregistrez directement vos changements de prix ou couleurs.
                 </p>
               </div>
             </div>
 
-            {/* Couleurs & tailles */}
             <ProductVariantsEditor
               initialColors={product.colors ?? []}
               initialSizes={product.sizes ?? []}
             />
 
-            {/* Caractéristiques du produit */}
             <div className="space-y-2 rounded-xl border border-zinc-200 p-3">
               <p className="text-xs font-semibold text-zinc-700">Caractéristiques du produit</p>
               <ProductFeaturesEditor
                 images={product.images.map((img) => ({ id: img.id, url: img.url }))}
-                features={(product as any).features ?? []}
+                features={product.features}
               />
             </div>
 
-            {/* Prix principal */}
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-zinc-800" htmlFor="price">
@@ -413,7 +411,6 @@ export default async function EditProductPage({ params }: EditPageProps) {
               </div>
             </div>
 
-            {/* Offres 2x / 3x */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 rounded-xl border border-zinc-200 p-3">
                 <p className="text-xs font-semibold text-zinc-700">Offre 2 × produit</p>
@@ -480,21 +477,8 @@ export default async function EditProductPage({ params }: EditPageProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2 text-sm">
-              <a
-                href="/admin/products"
-                className="inline-flex items-center rounded-full border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-50"
-              >
-                Annuler
-              </a>
-              <button
-                type="submit"
-                className="inline-flex items-center rounded-full bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-800"
-              >
-                Enregistrer
-              </button>
-            </div>
-          </form>
+            <input type="hidden" name="description" value={product.description} />
+          </ProductEditForm>
         </div>
       </main>
     </div>

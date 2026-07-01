@@ -185,6 +185,7 @@ export default function NewProductPage() {
           <h1 className="text-2xl font-semibold tracking-tight mb-6">Ajouter un produit</h1>
           <form
             action={createProduct}
+            encType="multipart/form-data"
             className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100"
           >
             {/* Nom */}
