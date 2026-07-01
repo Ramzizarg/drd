@@ -85,6 +85,7 @@ model Product {
 
   colors      String[] @default([])
   sizes       String[] @default([])
+  colorSizes  Json     @default("{}") @map("color_sizes")
 
   @@map("products")
 }

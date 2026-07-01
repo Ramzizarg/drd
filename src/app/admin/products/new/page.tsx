@@ -8,7 +8,7 @@ import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader"
 import { ProductFeaturesNewEditor } from "@/components/admin/ProductFeaturesNewEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { uploadFile } from "@/lib/upload";
-import { parseVariantList } from "@/lib/product-options";
+import { parseColorSizesFromForm, colorSizesToDbFields } from "@/lib/product-options";
 
 async function createProduct(formData: FormData) {
   "use server";
@@ -29,8 +29,8 @@ async function createProduct(formData: FormData) {
   const primaryIndex = parseInt(String(formData.get("primaryIndex") || "0"));
   const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
   const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
-  const colors = parseVariantList(formData.getAll("colors"));
-  const sizes = parseVariantList(formData.getAll("sizes"));
+  const parsedColorSizes = parseColorSizesFromForm(formData);
+  const { colorSizes, colors, sizes } = colorSizesToDbFields(parsedColorSizes);
   
   if (!files || files.length === 0) {
     redirect("/admin/products");
@@ -77,6 +77,7 @@ async function createProduct(formData: FormData) {
       offer3SalePrice: offer3SalePrice && !Number.isNaN(offer3SalePrice) ? offer3SalePrice : null,
       colors,
       sizes,
+      colorSizes,
     },
   });
   

@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import emailjs from "@emailjs/browser";
-import { getColorHex } from "@/lib/product-options";
+import { getColorHex, getProductColors, getSizesForColor, isValidColorSizePair, resolveProductColorSizes } from "@/lib/product-options";
 import {
   createDefaultVariants,
   formatVariantSelections,
@@ -46,6 +46,7 @@ interface Product {
   features?: ProductFeatureFromApi[];
   colors?: string[];
   sizes?: string[];
+  colorSizes?: Record<string, string[]>;
 }
 
 export default function ProductByIdPage() {
@@ -100,17 +101,25 @@ export default function ProductByIdPage() {
 
   useEffect(() => {
     if (!product) return;
+    const colorSizes = resolveProductColorSizes(product);
+    const availableColors = getProductColors(colorSizes);
     const itemCount = getItemCountForPack(selectedPack);
     setSelectedVariants((current) => {
-      const next = createDefaultVariants(
-        itemCount,
-        product.colors ?? [],
-        product.sizes ?? []
-      );
-      return next.map((variant, index) => ({
-        color: current[index]?.color || variant.color,
-        size: current[index]?.size || variant.size,
-      }));
+      const next = createDefaultVariants(itemCount, colorSizes);
+      return next.map((variant, index) => {
+        const previous = current[index];
+        if (!previous) return variant;
+
+        const color = availableColors.includes(previous.color)
+          ? previous.color
+          : variant.color;
+        const allowedSizes = getSizesForColor(colorSizes, color);
+        const size = allowedSizes.includes(previous.size)
+          ? previous.size
+          : allowedSizes[0] ?? "";
+
+        return { color, size };
+      });
     });
   }, [product, selectedPack]);
 
@@ -273,6 +282,10 @@ export default function ProductByIdPage() {
   };
 
   const packShortName = product.name.split(" - ")[0];
+  const colorSizes = resolveProductColorSizes(product);
+  const productColors = getProductColors(colorSizes);
+  const hasColorVariants = productColors.length > 0;
+  const hasSizeVariants = Object.values(colorSizes).some((sizes) => sizes.length > 0);
 
   const selectedPackInfo = packPrices[selectedPack];
   const subtotal = selectedPackInfo.sale;
@@ -332,12 +345,15 @@ export default function ProductByIdPage() {
     const address = addressInputRef.current?.value.trim() ?? "";
     const phone = phoneInputRef.current?.value.trim() ?? "";
     const governor = selectedGovernor.trim();
-    const hasColors = (product?.colors?.length ?? 0) > 0;
-    const hasSizes = (product?.sizes?.length ?? 0) > 0;
+    const hasColors = hasColorVariants;
+    const hasSizes = hasSizeVariants;
 
     const variantErrors = selectedVariants.map((variant) => ({
       color: hasColors && !variant.color,
-      size: hasSizes && !variant.size,
+      size:
+        hasSizes &&
+        (!variant.size ||
+          !isValidColorSizePair(colorSizes, variant.color, variant.size)),
     }));
 
     const nextFieldErrors = {
@@ -822,10 +838,11 @@ export default function ProductByIdPage() {
           )}
 
           {/* Couleur & taille — une sélection par article selon l'offre */}
-          {((product.colors?.length ?? 0) > 0 || (product.sizes?.length ?? 0) > 0) && (
+          {((productColors.length ?? 0) > 0 || hasSizeVariants) && (
             <div className="space-y-4 text-sm">
               {selectedVariants.map((variant, index) => {
                 const variantError = fieldErrors.variants[index];
+                const availableSizes = getSizesForColor(colorSizes, variant.color);
                 const itemLabel =
                   selectedVariants.length > 1
                     ? `${packShortName} ${index + 1}`
@@ -844,13 +861,13 @@ export default function ProductByIdPage() {
                       <p className="text-sm font-semibold text-zinc-900">{itemLabel}</p>
                     )}
 
-                    {(product.colors?.length ?? 0) > 0 && (
+                    {(productColors.length ?? 0) > 0 && (
                       <div className="space-y-2">
                         <p className="font-medium">
                           Couleur <span className="text-red-500">*</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {product.colors!.map((color) => {
+                          {productColors.map((color) => {
                             const isActive = variant.color === color;
                             const hex = getColorHex(color);
                             return (
@@ -859,9 +876,17 @@ export default function ProductByIdPage() {
                                 type="button"
                                 onClick={() =>
                                   setSelectedVariants((current) =>
-                                    current.map((entry, entryIndex) =>
-                                      entryIndex === index ? { ...entry, color } : entry
-                                    )
+                                    current.map((entry, entryIndex) => {
+                                      if (entryIndex !== index) return entry;
+                                      const sizesForColor = getSizesForColor(
+                                        colorSizes,
+                                        color
+                                      );
+                                      const size = sizesForColor.includes(entry.size)
+                                        ? entry.size
+                                        : sizesForColor[0] ?? "";
+                                      return { color, size };
+                                    })
                                   )
                                 }
                                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
@@ -885,13 +910,13 @@ export default function ProductByIdPage() {
                       </div>
                     )}
 
-                    {(product.sizes?.length ?? 0) > 0 && (
+                    {variant.color && availableSizes.length > 0 && (
                       <div className="space-y-2">
                         <p className="font-medium">
                           Taille <span className="text-red-500">*</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {product.sizes!.map((size) => {
+                          {availableSizes.map((size) => {
                             const isActive = variant.size === size;
                             return (
                               <button
@@ -919,6 +944,12 @@ export default function ProductByIdPage() {
                           <p className="text-xs text-red-600">Merci de choisir une taille.</p>
                         )}
                       </div>
+                    )}
+
+                    {hasSizeVariants && !variant.color && (
+                      <p className="text-xs text-zinc-500">
+                        Choisissez d&apos;abord une couleur pour voir les tailles disponibles.
+                      </p>
                     )}
                   </div>
                 );

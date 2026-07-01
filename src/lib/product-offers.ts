@@ -89,12 +89,15 @@ export type VariantSelection = { color: string; size: string };
 
 export function createDefaultVariants(
   count: number,
-  colors: string[] = [],
-  sizes: string[] = []
+  colorSizes: Record<string, string[]> = {}
 ): VariantSelection[] {
+  const colors = Object.keys(colorSizes);
+  const firstColor = colors[0] ?? "";
+  const firstSize = colorSizes[firstColor]?.[0] ?? "";
+
   return Array.from({ length: count }, () => ({
-    color: colors[0] ?? "",
-    size: sizes[0] ?? "",
+    color: firstColor,
+    size: firstSize,
   }));
 }
 

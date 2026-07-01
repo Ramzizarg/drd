@@ -12,7 +12,7 @@ import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor"
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { ProductEditForm } from "@/components/admin/ProductEditForm";
 import { uploadFile } from "@/lib/upload";
-import { parseVariantList } from "@/lib/product-options";
+import { parseColorSizesFromForm, colorSizesToDbFields, resolveProductColorSizes } from "@/lib/product-options";
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
@@ -56,8 +56,8 @@ async function updateProduct(
     const featureImageUrls = formData.getAll("featureImageUrls").map((v) => String(v));
     const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
     const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
-    const colors = parseVariantList(formData.getAll("colors"));
-    const sizes = parseVariantList(formData.getAll("sizes"));
+    const parsedColorSizes = parseColorSizesFromForm(formData);
+    const { colorSizes, colors, sizes } = colorSizesToDbFields(parsedColorSizes);
 
     if (!name || !price || Number.isNaN(price)) {
       return { error: "Le nom et le prix sont obligatoires." };
@@ -236,6 +236,7 @@ async function updateProduct(
         offer3SalePrice,
         colors,
         sizes,
+        colorSizes,
       },
     });
 
@@ -365,6 +366,7 @@ export default async function EditProductPage({ params, searchParams }: EditPage
             </div>
 
             <ProductVariantsEditor
+              initialColorSizes={resolveProductColorSizes(product)}
               initialColors={product.colors ?? []}
               initialSizes={product.sizes ?? []}
             />
