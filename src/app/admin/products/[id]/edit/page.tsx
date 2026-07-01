@@ -16,7 +16,7 @@ import { parseColorSizesFromForm, colorSizesToDbFields, resolveProductColorSizes
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; warn?: string }>;
 }
 
 type FormState = {
