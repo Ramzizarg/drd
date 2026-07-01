@@ -155,20 +155,29 @@ export default function ProductByIdPage() {
   // When images load or change, default the active image to the primary one
   useEffect(() => {
     if (!product) return;
-    const imgs = (product.images && product.images.length > 0)
-      ? [...product.images].sort((a, b) => {
-          if (a.isPrimary === b.isPrimary) return 0;
-          return a.isPrimary ? -1 : 1;
-        })
-      : product.imageUrl
-        ? [{ id: 0, url: product.imageUrl, isPrimary: true }]
-        : [];
+    const fromDb = product.images?.length ? [...product.images] : [];
+    const imgs =
+      fromDb.length === 0
+        ? product.imageUrl
+          ? [{ id: 0, url: product.imageUrl, isPrimary: true }]
+          : []
+        : (() => {
+            const list = [...fromDb];
+            if (product.imageUrl && !list.some((img) => img.url === product.imageUrl)) {
+              list.unshift({ id: 0, url: product.imageUrl, isPrimary: true });
+            }
+            return list.sort((a, b) => {
+              if (a.isPrimary === b.isPrimary) return 0;
+              return a.isPrimary ? -1 : 1;
+            });
+          })();
 
     if (imgs.length === 0) return;
 
     const primaryIdx = imgs.findIndex((img) => img.isPrimary);
     const initialIndex = primaryIdx >= 0 ? primaryIdx : 0;
     setActiveImageIndex(initialIndex);
+    setActiveSlide(initialIndex);
   }, [product]);
 
   useEffect(() => {
@@ -223,19 +232,26 @@ export default function ProductByIdPage() {
   }
 
   const base = product.price;
-  const images = (product.images && product.images.length > 0)
-    ? [...product.images].sort((a, b) => {
-        if (a.isPrimary === b.isPrimary) return 0;
-        return a.isPrimary ? -1 : 1;
-      })
-    : product.imageUrl
-      ? [{ id: 0, url: product.imageUrl, isPrimary: true }]
-      : [];
+  const images = (() => {
+    const fromDb = product.images?.length ? [...product.images] : [];
+
+    if (fromDb.length === 0) {
+      return product.imageUrl
+        ? [{ id: 0, url: product.imageUrl, isPrimary: true }]
+        : [];
+    }
+
+    if (product.imageUrl && !fromDb.some((img) => img.url === product.imageUrl)) {
+      fromDb.unshift({ id: 0, url: product.imageUrl, isPrimary: true });
+    }
+
+    return fromDb.sort((a, b) => {
+      if (a.isPrimary === b.isPrimary) return 0;
+      return a.isPrimary ? -1 : 1;
+    });
+  })();
 
   const primaryImage = images.find((img) => img.isPrimary) ?? images[0] ?? null;
-  const galleryImages = primaryImage
-    ? images.filter((img) => img.id !== primaryImage.id)
-    : images;
 
   const currentImage =
     activeImageIndex !== null && images[activeImageIndex]
@@ -608,7 +624,13 @@ export default function ProductByIdPage() {
               )}
             </div>
           </div>
-          <div className="mt-3 flex justify-center gap-1">
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {images.length > 1 && (
+              <p className="text-xs font-medium text-zinc-500">
+                {activeSlide + 1} / {images.length}
+              </p>
+            )}
+            <div className="flex justify-center gap-1">
             {images.map((img, index) => (
               <button
                 key={img.id}
@@ -622,6 +644,7 @@ export default function ProductByIdPage() {
                   }`}
               />
             ))}
+            </div>
           </div>
         </div>
 
@@ -678,27 +701,31 @@ export default function ProductByIdPage() {
             )}
           </div>
 
-          <div className="mx-auto flex max-w-sm gap-3">
-            {galleryImages.map((img) => (
+          <div className="mx-auto flex max-w-sm gap-3 overflow-x-auto pb-1">
+            {images.map((img, index) => {
+              const isActive = currentImage?.id === img.id;
+              return (
               <button
                 key={img.id}
                 type="button"
                 onClick={() => {
-                  const idx = images.findIndex((i) => i.id === img.id);
-                  if (idx >= 0) {
-                    setActiveImageIndex(idx);
-                  }
+                  setActiveImageIndex(index);
                 }}
-                className="aspect-[4/5] w-20 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50"
+                className={`aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-xl border bg-zinc-50 transition ${
+                  isActive
+                    ? "border-[#ff6b00] ring-2 ring-[#ff6b00]/40"
+                    : "border-zinc-200 hover:border-zinc-300"
+                }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.url}
-                  alt={product.name}
+                  alt={`${product.name} - image ${index + 1}`}
                   className="h-full w-full object-cover"
                 />
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
