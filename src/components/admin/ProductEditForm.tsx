@@ -44,7 +44,6 @@ export function ProductEditForm({
   return (
     <form
       action={formAction}
-      encType="multipart/form-data"
       className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100"
     >
       {(state.success || saved) && (
