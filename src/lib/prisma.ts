@@ -9,13 +9,25 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
+function getDatabaseUrl(): string {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw) {
     throw new Error("DATABASE_URL is not set");
   }
 
-  const adapter = new PrismaNeon({ connectionString });
+  const connectionString = raw.replace(/^["']+|["']+$/g, "");
+  if (
+    !connectionString.startsWith("postgresql://") &&
+    !connectionString.startsWith("postgres://")
+  ) {
+    throw new Error("DATABASE_URL must be a PostgreSQL connection string");
+  }
+
+  return connectionString;
+}
+
+function createPrismaClient() {
+  const adapter = new PrismaNeon({ connectionString: getDatabaseUrl() });
   return new PrismaClient({ adapter });
 }
 

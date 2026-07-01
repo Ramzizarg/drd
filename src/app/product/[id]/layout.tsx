@@ -119,16 +119,20 @@ export default async function ProductIdLayout({
   const id = Number(idParam);
 
   if (idParam && !Number.isNaN(id)) {
-    const exists = await prisma.product.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    try {
+      const exists = await prisma.product.findUnique({
+        where: { id },
+        select: { id: true },
+      });
 
-    if (!exists) {
-      const firstProductId = await getFirstProductId();
-      if (firstProductId) {
-        redirect(`/product/${firstProductId}`);
+      if (!exists) {
+        const firstProductId = await getFirstProductId();
+        if (firstProductId) {
+          redirect(`/product/${firstProductId}`);
+        }
       }
+    } catch {
+      // Skip redirect if database is unavailable
     }
   }
 
