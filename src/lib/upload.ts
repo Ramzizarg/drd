@@ -26,7 +26,7 @@ export async function uploadFile(
 
   if (isVercel) {
     throw new Error(
-      "Stockage images non configuré sur Vercel. Créez un store Blob et ajoutez BLOB_READ_WRITE_TOKEN."
+      "Stockage images non configuré sur Vercel. Allez dans Vercel → Storage → Blob, créez un store, connectez-le au projet, puis redeployez."
     );
   }
 

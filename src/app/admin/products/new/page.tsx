@@ -3,145 +3,166 @@ import Link from "next/link";
 import { LayoutDashboard, LineChart, Package } from "lucide-react";
 import { AdminNavHomeLink } from "@/components/admin/AdminNavHomeLink";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { revalidatePath } from "next/cache";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
 import { ProductFeaturesNewEditor } from "@/components/admin/ProductFeaturesNewEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
+import { ProductEditForm } from "@/components/admin/ProductEditForm";
 import { uploadFile } from "@/lib/upload";
 import { parseColorSizesFromForm, colorSizesToDbFields } from "@/lib/product-options";
 
-async function createProduct(formData: FormData) {
+type FormState = {
+  error?: string;
+  success?: boolean;
+};
+
+function parseOptionalPrice(raw: FormDataEntryValue | null): number | null {
+  if (raw == null || String(raw).trim() === "") return null;
+  const value = parseFloat(String(raw));
+  return Number.isNaN(value) ? null : value;
+}
+
+async function createProduct(_prevState: FormState, formData: FormData): Promise<FormState> {
   "use server";
 
-  const name = String(formData.get("name") || "").trim();
-  const price = parseFloat(String(formData.get("price") || "0"));
-  const salePriceRaw = formData.get("salePrice");
-  const salePrice = salePriceRaw ? parseFloat(String(salePriceRaw)) : null;
-  const offer2OriginalRaw = formData.get("offer2OriginalPrice");
-  const offer2SaleRaw = formData.get("offer2SalePrice");
-  const offer3OriginalRaw = formData.get("offer3OriginalPrice");
-  const offer3SaleRaw = formData.get("offer3SalePrice");
-  const offer2OriginalPrice = offer2OriginalRaw ? parseFloat(String(offer2OriginalRaw)) : null;
-  const offer2SalePrice = offer2SaleRaw ? parseFloat(String(offer2SaleRaw)) : null;
-  const offer3OriginalPrice = offer3OriginalRaw ? parseFloat(String(offer3OriginalRaw)) : null;
-  const offer3SalePrice = offer3SaleRaw ? parseFloat(String(offer3SaleRaw)) : null;
-  const files = formData.getAll("files") as File[];
-  const primaryIndex = parseInt(String(formData.get("primaryIndex") || "0"));
-  const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
-  const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
-  const parsedColorSizes = parseColorSizesFromForm(formData);
-  const { colorSizes, colors, sizes } = colorSizesToDbFields(parsedColorSizes);
-  
-  if (!files || files.length === 0) {
-    redirect("/admin/products");
-  }
+  try {
+    const name = String(formData.get("name") || "").trim();
+    const price = parseFloat(String(formData.get("price") || "0"));
+    const salePrice = parseOptionalPrice(formData.get("salePrice"));
+    const offer2OriginalPrice = parseOptionalPrice(formData.get("offer2OriginalPrice"));
+    const offer2SalePrice = parseOptionalPrice(formData.get("offer2SalePrice"));
+    const offer3OriginalPrice = parseOptionalPrice(formData.get("offer3OriginalPrice"));
+    const offer3SalePrice = parseOptionalPrice(formData.get("offer3SalePrice"));
+    const files = formData.getAll("files") as File[];
+    const primaryIndex = parseInt(String(formData.get("primaryIndex") || "0"), 10);
+    const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
+    const featureDescriptions = formData.getAll("featureDescriptions").map((v) => String(v));
+    const parsedColorSizes = parseColorSizesFromForm(formData);
+    const { colorSizes, colors, sizes } = colorSizesToDbFields(parsedColorSizes);
 
-  if (!name || !price || Number.isNaN(price)) {
-    // In real app you'd return validation errors; here we just redirect back.
-    redirect("/admin/products");
-  }
-
-  // Upload all files and collect their URLs
-  const uploadedFiles: { url: string; isPrimary: boolean }[] = [];
-  
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (!file || !file.name) continue;
-    
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    const url = await uploadFile(`products`, file.name, buffer, file.type);
-
-    uploadedFiles.push({
-      url,
-      isPrimary: i === primaryIndex
-    });
-  }
-  
-  if (uploadedFiles.length === 0) {
-    redirect("/admin/products");
-  }
-  
-  // Create product with the primary image URL
-  const primaryImage = uploadedFiles[primaryIndex] || uploadedFiles[0];
-  const product = await prisma.product.create({
-    data: {
-      name,
-      description: "",
-      price,
-      salePrice: salePrice && !Number.isNaN(salePrice) ? salePrice : null,
-      imageUrl: primaryImage.url,
-      offer2OriginalPrice: offer2OriginalPrice && !Number.isNaN(offer2OriginalPrice) ? offer2OriginalPrice : null,
-      offer2SalePrice: offer2SalePrice && !Number.isNaN(offer2SalePrice) ? offer2SalePrice : null,
-      offer3OriginalPrice: offer3OriginalPrice && !Number.isNaN(offer3OriginalPrice) ? offer3OriginalPrice : null,
-      offer3SalePrice: offer3SalePrice && !Number.isNaN(offer3SalePrice) ? offer3SalePrice : null,
-      colors,
-      sizes,
-      colorSizes,
-    },
-  });
-  
-  // Create all product images
-  await Promise.all(
-    uploadedFiles.map((file, index) => 
-      prisma.productImage.create({
-        data: {
-          productId: product.id,
-          url: file.url,
-          isPrimary: index === primaryIndex,
-        },
-      })
-    )
-  );
-
-  // Create product features (Caractéristiques du produit) with their own images
-  // We expect one file input per row: featureNewImage_{index}
-  const featureUploads: (string | null)[] = [];
-
-  for (let i = 0; i < featureTitles.length; i++) {
-    const raw = formData.get(`featureNewImage_${i}`);
-    const file = raw instanceof File ? (raw as File) : null;
-
-    if (!file || !file.name || file.size <= 0) {
-      featureUploads[i] = null;
-      continue;
+    if (!name || !price || Number.isNaN(price)) {
+      return { error: "Le nom et le prix sont obligatoires." };
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const validFiles = Array.from(files).filter((file) => file && file.name && file.size > 0);
+    if (validFiles.length === 0) {
+      return { error: "Ajoutez au moins une image produit." };
+    }
 
-    featureUploads[i] = await uploadFile(`features`, file.name, buffer, file.type);
-  }
+    const uploadedFiles: { url: string; isPrimary: boolean }[] = [];
 
-  const featuresData = featureDescriptions
-    .map((description, index) => ({
-      title: (featureTitles[index] || "").trim(),
-      description: description.trim(),
-      imageUrl: featureUploads[index] ?? null,
-      order: index,
-    }))
-    // Save a feature as long as it has a title and an image; description is optional
-    .filter((f) => f.title && f.imageUrl);
+    for (const file of validFiles) {
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const url = await uploadFile("products", file.name, buffer, file.type);
+        uploadedFiles.push({ url, isPrimary: false });
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Impossible d'envoyer l'image produit.";
+        return { error: message };
+      }
+    }
 
-  if (featuresData.length > 0) {
-    await prisma.productFeature.createMany({
-      data: featuresData.map((f) => ({
-        productId: product.id,
-        title: f.title,
-        imageUrl: f.imageUrl!,
-        description: f.description,
-        order: f.order,
-      })),
+    const safePrimaryIndex =
+      primaryIndex >= 0 && primaryIndex < uploadedFiles.length ? primaryIndex : 0;
+    uploadedFiles.forEach((file, index) => {
+      file.isPrimary = index === safePrimaryIndex;
     });
-  }
 
-  redirect("/admin/products");
+    const primaryImage = uploadedFiles[safePrimaryIndex];
+    const product = await prisma.product.create({
+      data: {
+        name,
+        description: "",
+        price,
+        salePrice,
+        imageUrl: primaryImage.url,
+        offer2OriginalPrice,
+        offer2SalePrice,
+        offer3OriginalPrice,
+        offer3SalePrice,
+        colors,
+        sizes,
+        colorSizes,
+      },
+    });
+
+    await Promise.all(
+      uploadedFiles.map((file) =>
+        prisma.productImage.create({
+          data: {
+            productId: product.id,
+            url: file.url,
+            isPrimary: file.isPrimary,
+          },
+        })
+      )
+    );
+
+    const featureUploads: (string | null)[] = [];
+
+    for (let i = 0; i < featureTitles.length; i++) {
+      const raw = formData.get(`featureNewImage_${i}`);
+      const file = raw instanceof File ? raw : null;
+
+      if (!file || !file.name || file.size <= 0) {
+        featureUploads[i] = null;
+        continue;
+      }
+
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        featureUploads[i] = await uploadFile("features", file.name, buffer, file.type);
+      } catch {
+        featureUploads[i] = null;
+      }
+    }
+
+    const featuresData = featureDescriptions
+      .map((description, index) => ({
+        title: (featureTitles[index] || "").trim(),
+        description: description.trim(),
+        imageUrl: featureUploads[index] ?? null,
+        order: index,
+      }))
+      .filter((f) => f.title && f.imageUrl);
+
+    if (featuresData.length > 0) {
+      await prisma.productFeature.createMany({
+        data: featuresData.map((f) => ({
+          productId: product.id,
+          title: f.title,
+          imageUrl: f.imageUrl!,
+          description: f.description,
+          order: f.order,
+        })),
+      });
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath(`/product/${product.id}`);
+
+    redirect("/admin/products");
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    console.error("Error creating product", err);
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Une erreur est survenue lors de l'enregistrement.",
+    };
+  }
 }
 
 export default function NewProductPage() {
   return (
     <div className="min-h-screen bg-[#faf7f6] text-zinc-900 flex flex-col">
-      {/* Shared admin header */}
       <header className="bg-zinc-900 text-sm text-zinc-100 shadow">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
@@ -179,11 +200,7 @@ export default function NewProductPage() {
       <main className="flex-1 flex justify-center items-start px-4 pt-6 pb-12">
         <div className="w-full max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight mb-6">Ajouter un produit</h1>
-          <form
-            action={createProduct}
-            className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100"
-          >
-            {/* Nom */}
+          <ProductEditForm action={createProduct}>
             <div className="space-y-1">
               <label className="text-sm font-medium text-zinc-800" htmlFor="name">
                 Nom du produit
@@ -196,7 +213,6 @@ export default function NewProductPage() {
               />
             </div>
 
-            {/* Images */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-zinc-800">
                 Images du produit
@@ -207,16 +223,13 @@ export default function NewProductPage() {
               </p>
             </div>
 
-            {/* Couleurs & tailles */}
             <ProductVariantsEditor />
 
-            {/* Caractéristiques du produit */}
             <div className="space-y-2 rounded-xl border border-zinc-200 p-3">
               <p className="text-xs font-semibold text-zinc-700">Caractéristiques du produit</p>
               <ProductFeaturesNewEditor />
             </div>
 
-            {/* Prix principal */}
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-zinc-800" htmlFor="price">
@@ -249,7 +262,6 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            {/* Offres 2x / 3x */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 rounded-xl border border-zinc-200 p-3">
                 <p className="text-xs font-semibold text-zinc-700">Offre 2 × produit</p>
@@ -311,22 +323,7 @@ export default function NewProductPage() {
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <a
-                href="/admin/products"
-                className="inline-flex items-center rounded-full border border-zinc-300 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-              >
-                Annuler
-              </a>
-              <button
-                type="submit"
-                className="inline-flex items-center rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
-                Enregistrer
-              </button>
-            </div>
-          </form>
+          </ProductEditForm>
         </div>
       </main>
     </div>
