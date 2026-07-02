@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, ChangeEvent, MouseEvent, useId } from "react";
+import { useState, useRef, ChangeEvent, MouseEvent, useId, useEffect } from "react";
 
 interface ExistingImage {
   id: number;
@@ -42,6 +42,27 @@ export function ProductImagesUploader({
     inputRef.current.files = dataTransfer.files;
   };
 
+  useEffect(() => {
+    syncInputFiles(files);
+  }, [files]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const form = input.closest("form");
+    if (!form) return;
+
+    const syncBeforeSubmit = () => {
+      if (files.length > 0) {
+        syncInputFiles(files);
+      }
+    };
+
+    form.addEventListener("submit", syncBeforeSubmit, true);
+    return () => form.removeEventListener("submit", syncBeforeSubmit, true);
+  }, [files]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected || selected.length === 0) return;
@@ -79,6 +100,11 @@ export function ProductImagesUploader({
     setFiles(nextFiles);
     setPreviews(nextPreviews);
     syncInputFiles(nextFiles);
+
+    if (nextFiles.length > 0 && primaryNewIndex < 0 && activeExistingCount === 0) {
+      setPrimaryNewIndex(0);
+    }
+
     e.target.value = "";
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 type FormState = {
@@ -28,11 +28,19 @@ function SubmitButton() {
 
 export function ProductEditForm({ action, children }: ProductEditFormProps) {
   const [state, formAction] = useActionState(action, {});
+  const [, startTransition] = useTransition();
 
   return (
     <form
-      action={formAction}
+      encType="multipart/form-data"
       className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(() => {
+          formAction(formData);
+        });
+      }}
     >
       {state.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
