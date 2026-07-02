@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Logo } from "@/components/Logo";
 import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader";
-import { ExistingProductImagesEditor } from "@/components/admin/ExistingProductImagesEditor";
 import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { ProductEditForm } from "@/components/admin/ProductEditForm";
@@ -17,7 +16,6 @@ import { parseColorSizesFromForm, colorSizesToDbFields, resolveProductColorSizes
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; warn?: string }>;
 }
 
 type FormState = {
@@ -83,16 +81,24 @@ async function updateProduct(
     }
 
     if (uploadedFiles.length > 0) {
-      let safePrimaryIndex = primaryIndex;
-      if (safePrimaryIndex < 0 || safePrimaryIndex >= uploadedFiles.length) {
-        safePrimaryIndex = 0;
+      const useNewPrimary =
+        primaryIndex >= 0 && primaryIndex < uploadedFiles.length && !primaryExistingIdRaw;
+
+      if (useNewPrimary) {
+        uploadedFiles.forEach((file, index) => {
+          file.isPrimary = index === primaryIndex;
+        });
+        newPrimaryUrl = uploadedFiles[primaryIndex].url;
+
+        await prisma.productImage.updateMany({
+          where: { productId: id },
+          data: { isPrimary: false },
+        });
+      } else {
+        uploadedFiles.forEach((file) => {
+          file.isPrimary = false;
+        });
       }
-
-      uploadedFiles.forEach((file, index) => {
-        file.isPrimary = index === safePrimaryIndex;
-      });
-
-      newPrimaryUrl = uploadedFiles[safePrimaryIndex].url;
 
       await Promise.all(
         uploadedFiles.map((file) =>
@@ -247,11 +253,11 @@ async function updateProduct(
 
     if (uploadWarnings.length > 0) {
       redirect(
-        `/admin/products/${id}/edit?saved=1&warn=${encodeURIComponent(uploadWarnings[0])}`
+        `/admin/products?saved=1&warn=${encodeURIComponent(uploadWarnings[0])}`
       );
     }
 
-    redirect(`/admin/products/${id}/edit?saved=1`);
+    redirect("/admin/products?saved=1");
   } catch (err) {
     if (isRedirectError(err)) throw err;
     console.error("Error updating product", err);
@@ -264,9 +270,8 @@ async function updateProduct(
   }
 }
 
-export default async function EditProductPage({ params, searchParams }: EditPageProps) {
+export default async function EditProductPage({ params }: EditPageProps) {
   const { id } = await params;
-  const { saved, warn } = await searchParams;
   const numericId = Number(id);
 
   if (Number.isNaN(numericId)) notFound();
@@ -321,16 +326,7 @@ export default async function EditProductPage({ params, searchParams }: EditPage
         <div className="w-full max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight mb-6">Modifier le produit</h1>
 
-          <ProductEditForm
-            action={updateProduct.bind(null, product.id)}
-            saved={saved === "1"}
-          >
-            {warn && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Produit enregistré, mais : {decodeURIComponent(warn)}
-              </div>
-            )}
-
+          <ProductEditForm action={updateProduct.bind(null, product.id)}>
             <div className="space-y-1">
               <label className="text-sm font-medium text-zinc-800" htmlFor="name">
                 Nom du produit
@@ -349,11 +345,7 @@ export default async function EditProductPage({ params, searchParams }: EditPage
                 <label className="text-sm font-medium text-zinc-800">
                   Images du produit
                 </label>
-                <ProductImagesUploader>
-                  {product.images.length > 0 && (
-                    <ExistingProductImagesEditor images={product.images} />
-                  )}
-                </ProductImagesUploader>
+                <ProductImagesUploader existingImages={product.images} />
                 <p className="text-[11px] text-zinc-500">
                   Modifiez les images si besoin. Sinon, enregistrez directement vos changements de prix ou couleurs.
                 </p>

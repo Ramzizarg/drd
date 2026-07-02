@@ -12,7 +12,12 @@ async function deleteProduct(id: number) {
   redirect("/admin/products");
 }
 
-export default async function AdminProductsPage() {
+export default async function AdminProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string; warn?: string }>;
+}) {
+  const { saved, warn } = await searchParams;
   const products = await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -84,6 +89,18 @@ export default async function AdminProductsPage() {
 
         <section className="space-y-4">
           <h1 className="text-2xl font-semibold tracking-tight">Gestion des produits</h1>
+
+          {saved === "1" && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Modifications enregistrées avec succès.
+            </div>
+          )}
+
+          {warn && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Produit enregistré, mais : {decodeURIComponent(warn)}
+            </div>
+          )}
 
           {products.length === 0 ? (
             <p className="mt-4 text-sm text-zinc-500">
