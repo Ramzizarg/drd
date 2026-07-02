@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -484,7 +485,7 @@ export default function ProductByIdPage() {
 
           {/* Center: brand logo */}
           <div className="flex items-center justify-center">
-            <Logo height={48} priority />
+            <Logo height={48} priority href="/" />
           </div>
 
           {/* Right: recherche + panier + coût */}
@@ -1285,6 +1286,14 @@ export default function ProductByIdPage() {
             </div>
 
             <nav className="flex-1 px-4 py-4 text-sm text-zinc-800">
+              <Link
+                href="/"
+                onClick={() => setIsMenuOpen(false)}
+                className="mb-4 flex w-full items-center gap-2 rounded-lg px-2 py-2 font-medium hover:bg-zinc-50"
+              >
+                Accueil
+              </Link>
+
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
                 Produits
               </p>

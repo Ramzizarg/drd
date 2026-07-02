@@ -15,3 +15,8 @@ export async function getFirstProductId(): Promise<number | null> {
     return null;
   }
 }
+
+export async function getHomeHref(): Promise<string> {
+  const firstProductId = await getFirstProductId();
+  return firstProductId ? `/product/${firstProductId}` : "/admin/products";
+}

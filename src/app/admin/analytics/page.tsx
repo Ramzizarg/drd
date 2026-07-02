@@ -18,8 +18,8 @@ import {
   LayoutDashboard,
   LineChart,
   Package,
-  Home,
 } from "lucide-react";
+import { AdminNavHomeLink } from "@/components/admin/AdminNavHomeLink";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Logo } from "@/components/Logo";
 
@@ -143,13 +143,7 @@ export default async function AnalyticsPage() {
               <Package className="h-5 w-5 md:h-4 md:w-4 text-zinc-100" />
               <span className="hidden md:inline">Gérer produits</span>
             </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-100 hover:text-white transition-colors"
-            >
-              <Home className="h-5 w-5 md:h-4 md:w-4 text-zinc-100" />
-              <span className="hidden md:inline">Accueil</span>
-            </Link>
+            <AdminNavHomeLink />
             <SignOutButton />
           </nav>
         </div>
