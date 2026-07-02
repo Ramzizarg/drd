@@ -11,6 +11,10 @@ export async function GET(
 
     const result = await readBlobMedia(pathname);
 
+    if (!result) {
+      return new Response("Image introuvable", { status: 404 });
+    }
+
     if (result.statusCode === 304 || !result.stream) {
       return new Response(null, { status: 304 });
     }
