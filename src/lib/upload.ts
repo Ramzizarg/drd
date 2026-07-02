@@ -14,6 +14,13 @@ function getBlobAccess(): BlobAccessType {
   return "private";
 }
 
+function hasBlobStorage(): boolean {
+  if (process.env.BLOB_READ_WRITE_TOKEN?.trim()) return true;
+  // Vercel OIDC auth when the Blob store is connected to the project
+  if (process.env.VERCEL === "1" && process.env.BLOB_STORE_ID?.trim()) return true;
+  return false;
+}
+
 export function toBlobMediaUrl(pathname: string): string {
   return `/api/blob/${pathname.split("/").map(encodeURIComponent).join("/")}`;
 }
@@ -25,27 +32,35 @@ export async function uploadFile(
   contentType?: string
 ): Promise<string> {
   const filename = `${Date.now()}-${sanitizeFilename(originalName)}`;
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
   const isVercel = process.env.VERCEL === "1";
 
-  if (token) {
-    const access = getBlobAccess();
-    const blob = await put(`${folder}/${filename}`, buffer, {
-      access,
-      contentType,
-      addRandomSuffix: true,
-    });
+  if (hasBlobStorage()) {
+    try {
+      const access = getBlobAccess();
+      const blob = await put(`${folder}/${filename}`, buffer, {
+        access,
+        contentType,
+        addRandomSuffix: true,
+      });
 
-    if (access === "private") {
-      return toBlobMediaUrl(blob.pathname);
+      if (access === "private") {
+        return toBlobMediaUrl(blob.pathname);
+      }
+
+      return blob.url;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Erreur inconnue";
+      throw new Error(
+        isVercel
+          ? `Échec de l'upload Blob sur Vercel : ${detail}. Vérifiez que le store Blob est connecté au projet (Storage → Blob → Connect to Project), puis redeployez.`
+          : detail
+      );
     }
-
-    return blob.url;
   }
 
   if (isVercel) {
     throw new Error(
-      "Stockage images non configuré sur Vercel. Allez dans Vercel → Storage → Blob, connectez le store au projet, puis redeployez."
+      "Stockage images non configuré sur Vercel. Allez dans Storage → Blob, connectez le store au projet (Connect to Project), puis redeployez."
     );
   }
 
