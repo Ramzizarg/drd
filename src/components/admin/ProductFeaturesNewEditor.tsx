@@ -10,6 +10,7 @@ interface FeatureRow {
 }
 
 export function ProductFeaturesNewEditor() {
+  const [mounted, setMounted] = useState(false);
   const [rows, setRows] = useState<FeatureRow[]>([{ 
     title: "", 
     description: "",
@@ -17,6 +18,10 @@ export function ProductFeaturesNewEditor() {
     previewUrl: ''
   }]);
   
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Clean up object URLs on unmount
   useEffect(() => {
     return () => {
@@ -201,8 +206,8 @@ export function ProductFeaturesNewEditor() {
             </div>
           </div>
           <div className="flex justify-between items-center pt-1 md:pt-6">
-            <div className="text-xs text-red-500">
-              {!row.previewUrl && 'Une image est requise'}
+            <div className="min-h-4 text-xs text-red-500">
+              {mounted && !row.previewUrl ? "Une image est requise" : null}
             </div>
             <button
               type="button"
