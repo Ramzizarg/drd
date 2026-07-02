@@ -35,7 +35,6 @@ const products = [
     offer3OriginalPrice: 79.99,
     offer3SalePrice: 59.99,
   },
-  
 ];
 
 async function main() {
