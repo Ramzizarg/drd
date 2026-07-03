@@ -6,6 +6,7 @@ import {
   resolveProductColorSizes,
 } from "@/lib/product-options";
 import { prisma } from "@/lib/prisma";
+import { sendOrderNotificationEmail } from "@/lib/order-notification";
 
 function normalizeVariantList(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const product = await prisma.product.findUnique({
       where: { id: Number(productId) },
-      select: { colors: true, sizes: true, colorSizes: true },
+      select: { name: true, colors: true, sizes: true, colorSizes: true },
     });
 
     if (!product) {
@@ -124,6 +125,20 @@ export async function POST(req: NextRequest) {
         variantColors: colors,
         variantSizes: sizes,
       },
+    });
+
+    void sendOrderNotificationEmail({
+      productName: product.name,
+      productId: Number(productId),
+      pack: packNumber,
+      total: Number(total),
+      name: String(name),
+      phone: String(phone),
+      address: String(address),
+      governor: String(governor),
+      city: city != null && String(city).trim() !== "" ? String(city) : "",
+      variantColors: colors,
+      variantSizes: sizes,
     });
 
     return NextResponse.json({ message: "ok", orderId: order.id }, { status: 201 });

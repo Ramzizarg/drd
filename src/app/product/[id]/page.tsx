@@ -5,11 +5,9 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import emailjs from "@emailjs/browser";
 import { getColorHex, getProductColors, getSizesForColor, isValidColorSizePair, resolveProductColorSizes } from "@/lib/product-options";
 import {
   createDefaultVariants,
-  formatVariantSelections,
   getItemCountForPack,
   getPackLineup,
   getPackPrices,
@@ -268,9 +266,6 @@ export default function ProductByIdPage() {
       ? images[activeImageIndex]
       : primaryImage;
 
-  /** Produit #2 (Ice Roller) : livraison 8 DT, champ ville. */
-  const classicIceRollerLayout = product.id === 2;
-
   const packPrices = getPackPrices(product);
   const packLineup = getPackLineup(product);
   const threeForTwoOffer = isThreeForTwoOffer(product);
@@ -293,12 +288,10 @@ export default function ProductByIdPage() {
 
   const mainOriginalPrice = packPrices[1].original ?? base;
   const mainDiscountedPrice = packPrices[1].sale;
-  const livraison = classicIceRollerLayout ? 8 : 0;
+  const livraison = 0;
   const total = subtotal + livraison;
 
-  const marqueeLivraisonText = classicIceRollerLayout
-    ? "Livraison partout en Tunisie 8 DT 🚚💨"
-    : "Livraison gratuite partout en Tunisie 🚚💨";
+  const marqueeLivraisonText = "Livraison gratuite partout en Tunisie 🚚💨";
 
   const governorates = [
     "Tunis",
@@ -392,7 +385,6 @@ export default function ProductByIdPage() {
 
     const variantColors = selectedVariants.map((variant) => variant.color);
     const variantSizes = selectedVariants.map((variant) => variant.size);
-    const variantSummary = formatVariantSelections(variantColors, variantSizes);
 
     try {
       await new Promise((r) => setTimeout(r, 2000));
@@ -421,30 +413,6 @@ export default function ProductByIdPage() {
       if (!res.ok) {
         setFormError("Une erreur est survenue lors de l'envoi de votre commande. Veuillez réessayer.");
         return;
-      }
-
-      try {
-        await emailjs.send(
-          "service_8mo5zdf",
-          "template_nrf56fs",
-          {
-            to_email: "farroukdrd@gmail.com",
-            product_name: product.name,
-            product_id: product.id,
-            pack: selectedPack,
-            total: total.toFixed(2),
-            name,
-            phone,
-            address,
-            governor,
-            city: "",
-            color: variantSummary,
-            size: variantSummary,
-          },
-          "yZvRvrVIR1bQvMzrS"
-        );
-      } catch (err) {
-        console.error("Erreur lors de l'envoi de l'email EmailJS", err);
       }
 
       setFormError(null);
@@ -575,20 +543,19 @@ export default function ProductByIdPage() {
       </div>
 
       <section className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:flex-row md:items-start">
-        {/* Galerie mobile : carrousel swipe gauche/droite */}
+        {/* Galerie mobile */}
         <div className="w-full md:hidden">
-          {/* Make product image visually smaller on mobile by reducing max width and height */}
-          <div className="mx-auto w-full max-w-xs overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50">
+          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 shadow-sm">
             <div
               ref={carouselRef}
               onScroll={handleMobileScroll}
-              className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth h-64"
+              className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             >
               {images.length > 0 ? (
                 images.map((img, index) => (
                   <div
                     key={img.id}
-                    className="relative min-w-full snap-center cursor-zoom-in"
+                    className="relative h-full min-w-full shrink-0 snap-center cursor-zoom-in"
                     onClick={() => {
                       setActiveSlide(index);
                       openZoomWithImage(img);
@@ -597,7 +564,8 @@ export default function ProductByIdPage() {
                     <img
                       src={img.url}
                       alt={product.name}
-                      className="h-full w-full object-cover"
+                      className="block h-full w-full object-cover"
+                      draggable={false}
                     />
                     <button
                       type="button"
@@ -606,63 +574,74 @@ export default function ProductByIdPage() {
                         setActiveSlide(index);
                         openZoomWithImage(img);
                       }}
-                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80"
+                      className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm"
                     >
-                      <svg
-                        aria-hidden
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                      >
-                        <circle
-                          cx="11"
-                          cy="11"
-                          r="5.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                        />
-                        <path
-                          d="m15.5 15.5 3.5 3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
+                      <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4">
+                        <circle cx="11" cy="11" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                        <path d="m15.5 15.5 3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                     </button>
                   </div>
                 ))
               ) : (
-                <div className="relative min-w-full snap-center">
-                  <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
-                    Aucune image disponible
-                  </div>
+                <div className="flex h-full min-w-full shrink-0 snap-center items-center justify-center">
+                  <p className="text-sm text-zinc-500">Aucune image disponible</p>
                 </div>
               )}
             </div>
-          </div>
-          <div className="mt-3 flex flex-col items-center gap-2">
+
             {images.length > 1 && (
-              <p className="text-xs font-medium text-zinc-500">
-                {activeSlide + 1} / {images.length}
-              </p>
+              <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 backdrop-blur-sm">
+                {images.map((img, index) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    aria-label={`Image ${index + 1}`}
+                    onClick={() => {
+                      const el = carouselRef.current;
+                      if (!el) return;
+                      el.scrollTo({ left: index * el.offsetWidth, behavior: "smooth" });
+                    }}
+                    className={`rounded-full transition-all ${
+                      index === activeSlide ? "h-2 w-5 bg-white" : "h-2 w-2 bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
             )}
-            <div className="flex justify-center gap-1">
-            {images.map((img, index) => (
-              <button
-                key={img.id}
-                type="button"
-                onClick={() => {
-                  const el = carouselRef.current;
-                  if (!el) return;
-                  el.scrollTo({ left: index * el.offsetWidth, behavior: "smooth" });
-                }}
-                className={`w-2 h-2 rounded-full ${index === activeSlide ? "bg-zinc-900" : "bg-zinc-400"
-                  }`}
-              />
-            ))}
-            </div>
           </div>
+
+          {images.length > 1 && (
+            <div className="mt-3 flex justify-center overflow-x-auto px-0.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex gap-2">
+              {images.map((img, index) => (
+                <button
+                  key={`thumb-${img.id}`}
+                  type="button"
+                  onClick={() => {
+                    const el = carouselRef.current;
+                    if (!el) return;
+                    el.scrollTo({ left: index * el.offsetWidth, behavior: "smooth" });
+                    setActiveSlide(index);
+                    setActiveImageIndex(index);
+                  }}
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 bg-zinc-50 transition ${
+                    index === activeSlide
+                      ? "border-[#ff6b00] ring-2 ring-[#ff6b00]/30"
+                      : "border-zinc-200 opacity-80"
+                  }`}
+                >
+                  <img
+                    src={img.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </button>
+              ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Colonne gauche : image principale + miniatures (desktop) */}
@@ -1106,11 +1085,7 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[13px] font-semibold text-zinc-800">
               <span>Livraison</span>
-              {classicIceRollerLayout ? (
-                <span>{livraison.toFixed(2)} DT</span>
-              ) : (
-                <span className="text-emerald-700">Gratuite</span>
-              )}
+              <span className="text-emerald-700">Gratuite</span>
             </div>
             <div className="mt-2 flex items-baseline justify-between border-t border-[#ffd9a3] pt-2">
               <span className="text-[13px] font-bold text-zinc-900 tracking-wide uppercase">
@@ -1366,11 +1341,7 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[11px] text-zinc-700">
               <span>Livraison</span>
-              {classicIceRollerLayout ? (
-                <span>{livraison.toFixed(2)} DT</span>
-              ) : (
-                <span className="text-emerald-700 font-medium">Gratuite</span>
-              )}
+              <span className="text-emerald-700 font-medium">Gratuite</span>
             </div>
             <div className="mt-1 flex items-baseline justify-between border-t border-[#ffd9a3] pt-1">
               <span className="font-semibold uppercase tracking-wide text-[10px] text-zinc-900">
