@@ -298,7 +298,7 @@ export default function ProductByIdPage() {
   const total = subtotal + livraison;
 
   const marqueeLivraisonText = isPaidDelivery
-    ? `Livraison ${livraison.toFixed(livraison % 1 === 0 ? 0 : 2)} DT partout en Tunisie 🚚💨`
+    ? "Livraison à domicile partout en Tunisie 🚚"
     : "Livraison gratuite partout en Tunisie 🚚💨";
 
   const livraisonLabel = isPaidDelivery
