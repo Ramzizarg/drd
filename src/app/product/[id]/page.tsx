@@ -41,6 +41,8 @@ interface Product {
   offer2SalePrice?: number | null;
   offer3OriginalPrice?: number | null;
   offer3SalePrice?: number | null;
+  deliveryType?: string | null;
+  deliveryFee?: number | null;
   images?: ProductImageFromApi[];
   features?: ProductFeatureFromApi[];
   colors?: string[];
@@ -288,10 +290,20 @@ export default function ProductByIdPage() {
 
   const mainOriginalPrice = packPrices[1].original ?? base;
   const mainDiscountedPrice = packPrices[1].sale;
-  const livraison = 0;
+  const isPaidDelivery =
+    product.deliveryType === "PAID" &&
+    product.deliveryFee != null &&
+    product.deliveryFee > 0;
+  const livraison = isPaidDelivery ? product.deliveryFee! : 0;
   const total = subtotal + livraison;
 
-  const marqueeLivraisonText = "Livraison gratuite partout en Tunisie 🚚💨";
+  const marqueeLivraisonText = isPaidDelivery
+    ? `Livraison ${livraison.toFixed(livraison % 1 === 0 ? 0 : 2)} DT partout en Tunisie 🚚💨`
+    : "Livraison gratuite partout en Tunisie 🚚💨";
+
+  const livraisonLabel = isPaidDelivery
+    ? `${livraison.toFixed(livraison % 1 === 0 ? 0 : 2)} DT`
+    : "Gratuite";
 
   const governorates = [
     "Tunis",
@@ -1085,7 +1097,9 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[13px] font-semibold text-zinc-800">
               <span>Livraison</span>
-              <span className="text-emerald-700">Gratuite</span>
+              <span className={isPaidDelivery ? "text-zinc-800" : "text-emerald-700"}>
+                {livraisonLabel}
+              </span>
             </div>
             <div className="mt-2 flex items-baseline justify-between border-t border-[#ffd9a3] pt-2">
               <span className="text-[13px] font-bold text-zinc-900 tracking-wide uppercase">
@@ -1341,7 +1355,13 @@ export default function ProductByIdPage() {
             </div>
             <div className="flex justify-between text-[11px] text-zinc-700">
               <span>Livraison</span>
-              <span className="text-emerald-700 font-medium">Gratuite</span>
+              <span
+                className={
+                  isPaidDelivery ? "font-medium text-zinc-800" : "text-emerald-700 font-medium"
+                }
+              >
+                {livraisonLabel}
+              </span>
             </div>
             <div className="mt-1 flex items-baseline justify-between border-t border-[#ffd9a3] pt-1">
               <span className="font-semibold uppercase tracking-wide text-[10px] text-zinc-900">

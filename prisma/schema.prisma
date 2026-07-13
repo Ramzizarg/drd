@@ -83,6 +83,10 @@ model Product {
   offer3OriginalPrice Float? @map("offer3_original_price")
   offer3SalePrice     Float? @map("offer3_sale_price")
 
+  // FREE = livraison gratuite ; PAID = frais en DT (deliveryFee)
+  deliveryType String  @default("FREE") @map("delivery_type")
+  deliveryFee  Float?  @map("delivery_fee")
+
   colors      String[] @default([])
   sizes       String[] @default([])
   colorSizes  Json     @default("{}") @map("color_sizes")

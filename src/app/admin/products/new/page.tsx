@@ -11,6 +11,7 @@ import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader"
 import { ProductFeaturesNewEditor } from "@/components/admin/ProductFeaturesNewEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { ProductEditForm } from "@/components/admin/ProductEditForm";
+import { ProductDeliveryEditor } from "@/components/admin/ProductDeliveryEditor";
 import { uploadFile } from "@/lib/upload";
 import { parseColorSizesFromForm, colorSizesToDbFields } from "@/lib/product-options";
 
@@ -36,6 +37,10 @@ async function createProduct(_prevState: FormState, formData: FormData): Promise
     const offer2SalePrice = parseOptionalPrice(formData.get("offer2SalePrice"));
     const offer3OriginalPrice = parseOptionalPrice(formData.get("offer3OriginalPrice"));
     const offer3SalePrice = parseOptionalPrice(formData.get("offer3SalePrice"));
+    const deliveryTypeRaw = String(formData.get("deliveryType") || "FREE").toUpperCase();
+    const deliveryType = deliveryTypeRaw === "PAID" ? "PAID" : "FREE";
+    const deliveryFee =
+      deliveryType === "PAID" ? parseOptionalPrice(formData.get("deliveryFee")) : null;
     const files = formData.getAll("files") as File[];
     const primaryIndex = parseInt(String(formData.get("primaryIndex") || "0"), 10);
     const featureTitles = formData.getAll("featureTitles").map((v) => String(v));
@@ -45,6 +50,10 @@ async function createProduct(_prevState: FormState, formData: FormData): Promise
 
     if (!name || !price || Number.isNaN(price)) {
       return { error: "Le nom et le prix sont obligatoires." };
+    }
+
+    if (deliveryType === "PAID" && (deliveryFee == null || deliveryFee < 0)) {
+      return { error: "Indiquez un montant de livraison valide (DT)." };
     }
 
     const validFiles = Array.from(files).filter((file) => file && file.name && file.size > 0);
@@ -86,6 +95,8 @@ async function createProduct(_prevState: FormState, formData: FormData): Promise
         offer2SalePrice,
         offer3OriginalPrice,
         offer3SalePrice,
+        deliveryType,
+        deliveryFee,
         colors,
         sizes,
         colorSizes,
@@ -323,6 +334,8 @@ export default function NewProductPage() {
                 </div>
               </div>
             </div>
+
+            <ProductDeliveryEditor />
           </ProductEditForm>
         </div>
       </main>

@@ -11,6 +11,7 @@ import { ProductImagesUploader } from "@/components/admin/ProductImagesUploader"
 import { ProductFeaturesEditor } from "@/components/admin/ProductFeaturesEditor";
 import { ProductVariantsEditor } from "@/components/admin/ProductVariantsEditor";
 import { ProductEditForm } from "@/components/admin/ProductEditForm";
+import { ProductDeliveryEditor } from "@/components/admin/ProductDeliveryEditor";
 import { uploadFile } from "@/lib/upload";
 import { parseColorSizesFromForm, colorSizesToDbFields, resolveProductColorSizes } from "@/lib/product-options";
 
@@ -45,6 +46,10 @@ async function updateProduct(
     const offer2SalePrice = parseOptionalPrice(formData.get("offer2SalePrice"));
     const offer3OriginalPrice = parseOptionalPrice(formData.get("offer3OriginalPrice"));
     const offer3SalePrice = parseOptionalPrice(formData.get("offer3SalePrice"));
+    const deliveryTypeRaw = String(formData.get("deliveryType") || "FREE").toUpperCase();
+    const deliveryType = deliveryTypeRaw === "PAID" ? "PAID" : "FREE";
+    const deliveryFee =
+      deliveryType === "PAID" ? parseOptionalPrice(formData.get("deliveryFee")) : null;
     const files = formData.getAll("files") as File[];
     const primaryIndexRaw = formData.get("primaryIndex");
     let primaryIndex = primaryIndexRaw != null ? Number(primaryIndexRaw) : -1;
@@ -60,6 +65,10 @@ async function updateProduct(
 
     if (!name || !price || Number.isNaN(price)) {
       return { error: "Le nom et le prix sont obligatoires." };
+    }
+
+    if (deliveryType === "PAID" && (deliveryFee == null || deliveryFee < 0)) {
+      return { error: "Indiquez un montant de livraison valide (DT)." };
     }
 
     const uploadWarnings: string[] = [];
@@ -241,6 +250,8 @@ async function updateProduct(
         offer2SalePrice,
         offer3OriginalPrice,
         offer3SalePrice,
+        deliveryType,
+        deliveryFee,
         colors,
         sizes,
         colorSizes,
@@ -465,6 +476,11 @@ export default async function EditProductPage({ params }: EditPageProps) {
                 </div>
               </div>
             </div>
+
+            <ProductDeliveryEditor
+              initialType={product.deliveryType === "PAID" ? "PAID" : "FREE"}
+              initialFee={product.deliveryFee}
+            />
 
             <input type="hidden" name="description" value={product.description} />
           </ProductEditForm>
