@@ -15,6 +15,7 @@ import {
   type PackKey,
   type VariantSelection,
 } from "@/lib/product-offers";
+import { trackMetaEvent } from "@/components/MetaPixel";
 
 interface ProductImageFromApi {
   id: number;
@@ -134,6 +135,13 @@ export default function ProductByIdPage() {
         }
         const data: Product = await res.json();
         setProduct(data);
+        trackMetaEvent("ViewContent", {
+          content_ids: [String(data.id)],
+          content_name: data.name,
+          content_type: "product",
+          value: data.salePrice ?? data.price,
+          currency: "TND",
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unexpected error");
       } finally {
@@ -426,6 +434,15 @@ export default function ProductByIdPage() {
         setFormError("Une erreur est survenue lors de l'envoi de votre commande. Veuillez réessayer.");
         return;
       }
+
+      trackMetaEvent("Purchase", {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        content_type: "product",
+        value: total,
+        currency: "TND",
+        num_items: getItemCountForPack(selectedPack),
+      });
 
       setFormError(null);
       setIsOrderSuccessOpen(true);
