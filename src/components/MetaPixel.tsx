@@ -32,6 +32,23 @@ export function trackMetaEvent(
   window.fbq("track", event, params ?? {});
 }
 
+export function getMetaCookies(): { fbp: string | null; fbc: string | null } {
+  if (typeof document === "undefined") return { fbp: null, fbc: null };
+  const cookies = document.cookie.split(";").map((c) => c.trim());
+  const read = (name: string) => {
+    const row = cookies.find((c) => c.startsWith(`${name}=`));
+    return row ? decodeURIComponent(row.slice(name.length + 1)) : null;
+  };
+  return { fbp: read("_fbp"), fbc: read("_fbc") };
+}
+
+export function createMetaEventId(prefix = "evt"): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function MetaPixelPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();

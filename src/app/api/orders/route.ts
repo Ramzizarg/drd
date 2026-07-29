@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { sendOrderNotificationEmail } from "@/lib/order-notification";
+import { sendMetaPurchaseEvent } from "@/lib/meta-conversions";
 import { getItemCountForPack, type PackKey } from "@/lib/product-offers";
 import {
   getProductColors,
   isValidColorSizePair,
   resolveProductColorSizes,
 } from "@/lib/product-options";
-import { prisma } from "@/lib/prisma";
-import { sendOrderNotificationEmail } from "@/lib/order-notification";
 
 function normalizeVariantList(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
   return values.map((value) => String(value).trim()).filter(Boolean);
+}
+
+function getClientIp(req: NextRequest): string | undefined {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim();
+  return req.headers.get("x-real-ip") || undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -30,6 +37,10 @@ export async function POST(req: NextRequest) {
       size,
       variantColors,
       variantSizes,
+      eventId,
+      eventSourceUrl,
+      fbp,
+      fbc,
     } = body || {};
 
     if (!productId || !pack || !total || !name || !phone || !address || !governor) {
@@ -110,11 +121,12 @@ export async function POST(req: NextRequest) {
       sizes = [];
     }
 
+    const orderTotal = Number(total);
     const order = await prisma.order.create({
       data: {
         productId: Number(productId),
         pack: packNumber,
-        total: Number(total),
+        total: orderTotal,
         name: String(name),
         phone: String(phone),
         address: String(address),
@@ -127,11 +139,35 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const purchaseEventId =
+      eventId && String(eventId).trim() !== ""
+        ? String(eventId)
+        : `order_${order.id}_${Date.now()}`;
+
+    void sendMetaPurchaseEvent({
+      eventId: purchaseEventId,
+      value: orderTotal,
+      currency: "TND",
+      contentIds: [String(productId)],
+      contentName: product.name,
+      numItems: expectedCount,
+      phone: String(phone),
+      name: String(name),
+      eventSourceUrl:
+        eventSourceUrl && String(eventSourceUrl).trim() !== ""
+          ? String(eventSourceUrl)
+          : undefined,
+      clientIpAddress: getClientIp(req),
+      clientUserAgent: req.headers.get("user-agent") || undefined,
+      fbp: fbp ? String(fbp) : null,
+      fbc: fbc ? String(fbc) : null,
+    });
+
     void sendOrderNotificationEmail({
       productName: product.name,
       productId: Number(productId),
       pack: packNumber,
-      total: Number(total),
+      total: orderTotal,
       name: String(name),
       phone: String(phone),
       address: String(address),
@@ -141,7 +177,10 @@ export async function POST(req: NextRequest) {
       variantSizes: sizes,
     });
 
-    return NextResponse.json({ message: "ok", orderId: order.id }, { status: 201 });
+    return NextResponse.json(
+      { message: "ok", orderId: order.id, eventId: purchaseEventId },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("Error creating order", err);
     return NextResponse.json({ message: "Erreur serveur" }, { status: 500 });

@@ -15,7 +15,7 @@ import {
   type PackKey,
   type VariantSelection,
 } from "@/lib/product-offers";
-import { trackMetaEvent } from "@/components/MetaPixel";
+import { trackMetaEvent, getMetaCookies, createMetaEventId } from "@/components/MetaPixel";
 
 interface ProductImageFromApi {
   id: number;
@@ -409,6 +409,9 @@ export default function ProductByIdPage() {
     try {
       await new Promise((r) => setTimeout(r, 2000));
 
+      const purchaseEventId = createMetaEventId(`order_${product.id}`);
+      const { fbp, fbc } = getMetaCookies();
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -427,6 +430,10 @@ export default function ProductByIdPage() {
           size: variantSizes[0] || null,
           variantColors,
           variantSizes,
+          eventId: purchaseEventId,
+          eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+          fbp,
+          fbc,
         }),
       });
 
@@ -435,14 +442,21 @@ export default function ProductByIdPage() {
         return;
       }
 
-      trackMetaEvent("Purchase", {
-        content_ids: [String(product.id)],
-        content_name: product.name,
-        content_type: "product",
-        value: total,
-        currency: "TND",
-        num_items: getItemCountForPack(selectedPack),
-      });
+      const orderData = await res.json().catch(() => null);
+      const eventId = orderData?.eventId || purchaseEventId;
+
+      trackMetaEvent(
+        "Purchase",
+        {
+          content_ids: [String(product.id)],
+          content_name: product.name,
+          content_type: "product",
+          value: total,
+          currency: "TND",
+          num_items: getItemCountForPack(selectedPack),
+        },
+        { eventID: eventId }
+      );
 
       setFormError(null);
       setIsOrderSuccessOpen(true);
