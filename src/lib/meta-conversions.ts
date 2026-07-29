@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 const META_PIXEL_ID =
   process.env.META_PIXEL_ID ||
   process.env.NEXT_PUBLIC_META_PIXEL_ID ||
-  "2130475847874319";
+  "27869121962771119";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
