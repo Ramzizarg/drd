@@ -7,6 +7,7 @@ import {
   type ColorSizesMap,
   getColorHex,
   normalizeColorSizesMap,
+  sortProductSizes,
 } from "@/lib/product-options";
 
 type ProductVariantsEditorProps = {
@@ -58,7 +59,7 @@ export function ProductVariantsEditor({
     setColorSizes((current) => {
       const currentSizes = current[colorName] ?? [];
       const nextSizes = enabled
-        ? Array.from(new Set([...currentSizes, size]))
+        ? sortProductSizes(Array.from(new Set([...currentSizes, size])))
         : currentSizes.filter((entry) => entry !== size);
 
       return {

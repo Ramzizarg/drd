@@ -17,6 +17,22 @@ export const PRODUCT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
 
 export type ColorSizesMap = Record<string, string[]>;
 
+const PRODUCT_SIZE_ORDER = new Map(
+  PRODUCT_SIZES.map((size, index) => [size, index])
+);
+
+/** Always order sizes small → large (XS … 3XL); unknown sizes keep relative order at the end. */
+export function sortProductSizes(sizes: string[]): string[] {
+  return [...sizes].sort((a, b) => {
+    const ai = PRODUCT_SIZE_ORDER.get(a);
+    const bi = PRODUCT_SIZE_ORDER.get(b);
+    if (ai != null && bi != null) return ai - bi;
+    if (ai != null) return -1;
+    if (bi != null) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 export function getColorHex(name: string): string {
   return PRODUCT_COLORS.find((c) => c.name === name)?.hex ?? "#d4d4d8";
 }
@@ -35,9 +51,11 @@ export function normalizeColorSizesMap(raw: unknown): ColorSizesMap {
     if (!trimmedColor) continue;
 
     const normalizedSizes = Array.isArray(sizes)
-      ? Array.from(
-          new Set(
-            sizes.map((size) => String(size).trim()).filter(Boolean)
+      ? sortProductSizes(
+          Array.from(
+            new Set(
+              sizes.map((size) => String(size).trim()).filter(Boolean)
+            )
           )
         )
       : [];
@@ -56,9 +74,10 @@ export function buildColorSizesFromLegacy(
 ): ColorSizesMap {
   if (colors.length === 0) return {};
 
+  const sortedSizes = sortProductSizes(sizes);
   const map: ColorSizesMap = {};
   for (const color of colors) {
-    map[color] = [...sizes];
+    map[color] = [...sortedSizes];
   }
   return map;
 }
@@ -84,7 +103,7 @@ export function getSizesForColor(
   fallbackSizes: string[] = []
 ): string[] {
   if (!color) return [];
-  return colorSizes[color] ?? fallbackSizes;
+  return sortProductSizes(colorSizes[color] ?? fallbackSizes);
 }
 
 export function parseColorSizesFromForm(formData: FormData): ColorSizesMap {
@@ -103,11 +122,14 @@ export function parseColorSizesFromForm(formData: FormData): ColorSizesMap {
 }
 
 export function colorSizesToDbFields(colorSizes: ColorSizesMap) {
-  const colors = Object.keys(colorSizes);
-  const sizes = Array.from(new Set(Object.values(colorSizes).flat()));
+  const normalized = normalizeColorSizesMap(colorSizes);
+  const colors = Object.keys(normalized);
+  const sizes = sortProductSizes(
+    Array.from(new Set(Object.values(normalized).flat()))
+  );
 
   return {
-    colorSizes,
+    colorSizes: normalized,
     colors,
     sizes,
   };
