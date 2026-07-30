@@ -17,7 +17,7 @@ export const PRODUCT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
 
 export type ColorSizesMap = Record<string, string[]>;
 
-const PRODUCT_SIZE_ORDER = new Map(
+const PRODUCT_SIZE_ORDER: Map<string, number> = new Map(
   PRODUCT_SIZES.map((size, index) => [size, index])
 );
 
