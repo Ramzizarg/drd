@@ -19,9 +19,17 @@ declare global {
   }
 }
 
+type MetaEventValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | undefined;
+
 export function trackMetaEvent(
   event: string,
-  params?: Record<string, string | number | boolean | undefined>,
+  params?: Record<string, MetaEventValue>,
   options?: { eventID?: string }
 ) {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return;
