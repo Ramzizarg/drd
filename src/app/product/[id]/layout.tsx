@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getFirstProductId } from "@/lib/products";
 
-const defaultSiteUrl = "https://clara.shop";
+const defaultSiteUrl = "https://drd-stk.vercel.app";
 
 function getSiteOrigin(): string {
   let raw = (process.env.NEXT_PUBLIC_SITE_URL || defaultSiteUrl).trim();

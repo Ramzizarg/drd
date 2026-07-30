@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://clara.shop"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://drd-stk.vercel.app"
   ),
   title: "DRD Fashion | Boutique officielle",
   description: "Découvrez les produits DRD Fashion et commandez facilement en ligne.",
