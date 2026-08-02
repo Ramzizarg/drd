@@ -81,7 +81,9 @@ export default async function AdminDashboard({
     return {
       id: Number(order.id) || 0,
       customerName: order.name,
-      city: order.city,
+      address: order.address ?? "",
+      governor: order.governor ?? "",
+      city: order.city ?? "",
       phone: order.phone,
       productName: product?.name ?? `Produit #${order.productId}`,
       productImageUrl: product?.imageUrl ?? null,
@@ -299,8 +301,16 @@ export default async function AdminDashboard({
                         {order.netTotal.toFixed(2)} DT
                       </div>
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-500 line-clamp-1">
-                      {order.city} · {order.phone}
+                    <div className="mt-0.5 text-xs text-zinc-500">
+                      <span className="font-medium text-zinc-600">{order.phone}</span>
+                      {(order.address || order.governor || order.city) && (
+                        <span className="mt-0.5 block whitespace-normal break-words">
+                          {[order.address, order.governor, order.city]
+                            .map((part) => String(part || "").trim())
+                            .filter(Boolean)
+                            .join(", ")}
+                        </span>
+                      )}
                     </div>
                   </div>
 
